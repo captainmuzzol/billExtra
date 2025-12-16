@@ -66,6 +66,23 @@
             </div>
         </header>
 
+        <!-- Floating Active Suspect Indicator -->
+        <transition name="fade">
+            <div v-if="activeSuspect"
+                class="fixed left-6 top-32 z-40 flex flex-col items-center gap-2 group cursor-pointer transition-transform hover:scale-105"
+                @click="currentTab = 'upload'" title="点击切换嫌疑人">
+                <div
+                    class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 shadow-lg flex items-center justify-center text-white font-bold text-xl border-2 border-white ring-2 ring-blue-100 group-hover:ring-blue-300 transition-all">
+                    {{ activeSuspect.name.charAt(0) }}
+                </div>
+                <span
+                    class="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-medium text-gray-700 shadow-sm border border-gray-100 group-hover:text-blue-600 group-hover:border-blue-200 transition-colors">
+                    {{ activeSuspect.name }}
+                </span>
+            </div>
+        </transition>
+
+
         <div class="container mx-auto px-6 py-8">
             <!-- Upload Section -->
             <div v-if="currentTab === 'upload'" class="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
@@ -374,22 +391,7 @@
                         </p>
                     </div>
                 </div>
-                <div v-else
-                    class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                            {{ activeSuspect.name.charAt(0) }}
-                        </div>
-                        <div>
-                            <span class="text-xs text-blue-500 font-bold uppercase tracking-wide">当前分析对象</span>
-                            <h3 class="text-blue-900 font-bold text-lg">{{ activeSuspect.name }}</h3>
-                        </div>
-                    </div>
-                    <button @click="currentTab = 'upload'"
-                        class="text-sm bg-white border border-blue-200 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 hover:text-blue-800 transition-colors shadow-sm">
-                        切换嫌疑人
-                    </button>
+                <div v-else class="hidden">
                 </div>
 
                 <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
@@ -519,22 +521,7 @@
                 </div>
 
                 <!-- Active Suspect Banner -->
-                <div v-else
-                    class="bg-blue-50 border border-blue-200 rounded-xl p-4 flex justify-between items-center shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div
-                            class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
-                            {{ activeSuspect.name.charAt(0) }}
-                        </div>
-                        <div>
-                            <span class="text-xs text-blue-500 font-bold uppercase tracking-wide">当前分析对象</span>
-                            <h3 class="text-blue-900 font-bold text-lg">{{ activeSuspect.name }}</h3>
-                        </div>
-                    </div>
-                    <button @click="currentTab = 'upload'"
-                        class="text-sm bg-white border border-blue-200 text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 hover:text-blue-800 transition-colors shadow-sm">
-                        切换嫌疑人
-                    </button>
+                <div v-else class="hidden">
                 </div>
 
                 <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -584,8 +571,8 @@
                                 </div>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                <div>
+                            <div class="flex flex-col md:flex-row gap-4 items-end">
+                                <div class="w-full md:w-32">
                                     <label class="block text-xs font-medium text-gray-500 mb-1">收/支类型</label>
                                     <select v-model="filters.category"
                                         class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all bg-white">
@@ -594,17 +581,17 @@
                                         <option value="支出">支出</option>
                                     </select>
                                 </div>
-                                <div>
+                                <div class="w-full md:flex-1">
                                     <label class="block text-xs font-medium text-gray-500 mb-1">交易类型</label>
                                     <input type="text" v-model="filters.transaction_type" placeholder="如：转账、红包"
                                         class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
                                 </div>
-                                <div>
+                                <div class="w-full md:flex-1">
                                     <label class="block text-xs font-medium text-gray-500 mb-1">商品/说明</label>
                                     <input type="text" v-model="filters.method" placeholder="关键词搜索"
                                         class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
                                 </div>
-                                <div>
+                                <div class="w-full md:flex-1">
                                     <label class="block text-xs font-medium text-gray-500 mb-1">金额范围</label>
                                     <div class="flex gap-2">
                                         <input type="number" step="0.01" v-model="filters.min_amount" placeholder="Min"
@@ -613,17 +600,16 @@
                                             class="w-full border border-gray-300 px-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all">
                                     </div>
                                 </div>
-                            </div>
-
-                            <div class="flex justify-end pt-2">
-                                <button @click="searchTransactions"
-                                    class="bg-blue-600 text-white px-8 py-2 rounded-lg font-medium hover:bg-blue-700 hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center gap-2">
-                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-                                    </svg>
-                                    查询记录
-                                </button>
+                                <div class="w-full md:w-auto">
+                                    <button @click="searchTransactions"
+                                        class="w-full md:w-auto bg-blue-600 text-white px-8 py-2 rounded-lg font-medium hover:bg-blue-700 hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200 flex items-center justify-center gap-2 whitespace-nowrap">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                                        </svg>
+                                        查询记录
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -722,45 +708,534 @@
             </div>
         </div>
 
-        <script>
-            const { createApp, ref, onMounted, watch, nextTick } = Vue;
+        <footer class="text-center text-xs text-gray-400 py-6 mt-8">
+            <p>&copy; 2026 账单神探 - 许钦滔</p>
+        </footer>
+    </div>
 
-            createApp({
-                setup() {
-                    const currentTab = ref('upload');
+    <script>
+        const { createApp, ref, onMounted, watch, nextTick } = Vue;
 
-                    // Suspect Management
-                    const suspects = ref([]);
-                    const activeSuspect = ref(null);
-                    const suspectSearch = ref('');
-                    const showSuspectModal = ref(false);
-                    const modalMode = ref('create'); // 'create' or 'append'
-                    const modalSuspectName = ref('');
-                    const modalSuspectPassword = ref('');
-                    const modalFiles = ref([]);
-                    const modalSuspectId = ref(null);
+        createApp({
+            setup() {
+                const currentTab = ref('upload');
 
-                    // Manage & Verify State
-                    const showManageModal = ref(false);
-                    const manageFiles = ref([]);
-                    const manageSuspectId = ref(null);
-                    const showVerifyModal = ref(false);
-                    const verifyPasswordInput = ref('');
-                    const verifyTargetSuspect = ref(null);
+                // Suspect Management
+                const suspects = ref([]);
+                const activeSuspect = ref(null);
+                const suspectSearch = ref('');
+                const showSuspectModal = ref(false);
+                const modalMode = ref('create'); // 'create' or 'append'
+                const modalSuspectName = ref('');
+                const modalSuspectPassword = ref('');
+                const modalFiles = ref([]);
+                const modalSuspectId = ref(null);
 
-                    // Dashboard & Transactions
-                    const summary = ref({ total_income: 0, total_expense: 0 });
-                    const transactions = ref([]);
-                    const totalTransactions = ref(0);
-                    const totalAmount = ref(0);
-                    const page = ref(1);
-                    const limit = 20;
+                // Manage & Verify State
+                const showManageModal = ref(false);
+                const manageFiles = ref([]);
+                const manageSuspectId = ref(null);
+                const showVerifyModal = ref(false);
+                const verifyPasswordInput = ref('');
+                const verifyTargetSuspect = ref(null);
 
-                    const uploading = ref(false);
-                    const uploadResult = ref(null);
-                    const uploadError = ref(null);
+                // Dashboard & Transactions
+                const summary = ref({ total_income: 0, total_expense: 0 });
+                const transactions = ref([]);
+                const totalTransactions = ref(0);
+                const totalAmount = ref(0);
+                const page = ref(1);
+                const limit = 20;
 
-                    const filters = ref({
+                const uploading = ref(false);
+                const uploadResult = ref(null);
+                const uploadError = ref(null);
+
+                const filters = ref({
+                    start_date: '',
+                    end_date: '',
+                    counterparty: '',
+                    category: '',
+                    transaction_type: '',
+                    method: '',
+                    min_amount: '',
+                    max_amount: ''
+                });
+
+                const dashboardFilters = ref({
+                    start_date: '',
+                    end_date: '',
+                    specific_amount: '',
+                    time_range: 'all', // all, day, night
+                    showEmptyCounterparty: true
+                });
+
+                const isAllTime = ref(true);
+
+                const pieChart = ref(null);
+                const lineChart = ref(null);
+                let myPieChart = null;
+                let myLineChart = null;
+                const datePickers = {}; // Store picker instances
+
+                const initDashboardPickers = () => {
+                    // Initialize Flatpickr
+                    const commonConfig = {
+                        locale: "zh",
+                        dateFormat: "Y-m-d",
+                        disableMobile: true, // Use Flatpickr UI on mobile too for consistency
+                        allowInput: true
+                    };
+
+                    // Dashboard Start Date
+                    if (document.querySelector("#dash-start")) {
+                        datePickers.dashStart = flatpickr("#dash-start", {
+                            ...commonConfig,
+                            onChange: (selectedDates, dateStr) => {
+                                dashboardFilters.value.start_date = dateStr;
+                                onDashboardFilterChange();
+                            }
+                        });
+                    }
+
+                    // Dashboard End Date
+                    if (document.querySelector("#dash-end")) {
+                        datePickers.dashEnd = flatpickr("#dash-end", {
+                            ...commonConfig,
+                            onChange: (selectedDates, dateStr) => {
+                                dashboardFilters.value.end_date = dateStr;
+                                onDashboardFilterChange();
+                            }
+                        });
+                    }
+                };
+
+                const initTransactionPickers = () => {
+                    // Initialize Flatpickr
+                    const commonConfig = {
+                        locale: "zh",
+                        dateFormat: "Y-m-d",
+                        disableMobile: true, // Use Flatpickr UI on mobile too for consistency
+                        allowInput: true
+                    };
+
+                    // Transactions Start Date
+                    if (document.querySelector("#trans-start")) {
+                        datePickers.transStart = flatpickr("#trans-start", {
+                            ...commonConfig,
+                            onChange: (selectedDates, dateStr) => {
+                                filters.value.start_date = dateStr;
+                            }
+                        });
+                    }
+
+                    // Transactions End Date
+                    if (document.querySelector("#trans-end")) {
+                        datePickers.transEnd = flatpickr("#trans-end", {
+                            ...commonConfig,
+                            onChange: (selectedDates, dateStr) => {
+                                filters.value.end_date = dateStr;
+                            }
+                        });
+                    }
+                };
+
+                onMounted(() => {
+                    loadSuspects();
+                    // If no suspects, stay on upload tab.
+                });
+
+                // --- Suspect Methods ---
+                const loadSuspects = async () => {
+                    let url = '/suspects';
+                    if (suspectSearch.value) {
+                        url += `?search=${suspectSearch.value}`;
+                    }
+                    const res = await fetch(url);
+                    suspects.value = await res.json();
+                };
+
+                const openSuspectModal = (mode, suspect = null) => {
+                    modalMode.value = mode;
+                    uploadResult.value = null;
+                    uploadError.value = null;
+                    modalFiles.value = [];
+
+                    if (mode === 'create') {
+                        modalSuspectName.value = '';
+                        modalSuspectPassword.value = '';
+                        modalSuspectId.value = null;
+                    } else if (mode === 'append' && suspect) {
+                        modalSuspectName.value = suspect.name;
+                        modalSuspectId.value = suspect.id;
+                        // For append, we assume authenticated session or simplified flow
+                        modalSuspectPassword.value = '';
+                    }
+                    showSuspectModal.value = true;
+                };
+
+                const closeSuspectModal = () => {
+                    showSuspectModal.value = false;
+                    loadSuspects(); // Refresh list
+                };
+
+                const handleModalFileChange = (e) => {
+                    const files = Array.from(e.target.files);
+                    modalFiles.value = [...modalFiles.value, ...files];
+                    // Reset input so same files can be selected again if needed
+                    e.target.value = '';
+                };
+
+                const removeModalFile = (index) => {
+                    modalFiles.value.splice(index, 1);
+                };
+
+                const openManageModal = async (suspect) => {
+                    manageSuspectId.value = suspect.id;
+                    const res = await fetch(`/suspects/${suspect.id}/files`);
+                    manageFiles.value = await res.json();
+                    showManageModal.value = true;
+                };
+
+                const deleteFile = async (filename) => {
+                    if (!confirm(`确定要删除文件 "${filename}" 及其所有交易记录吗？`)) return;
+                    await fetch(`/suspects/${manageSuspectId.value}/files?filename=${encodeURIComponent(filename)}`, {
+                        method: 'DELETE'
+                    });
+                    const res = await fetch(`/suspects/${manageSuspectId.value}/files`);
+                    manageFiles.value = await res.json();
+                    loadSuspects();
+                };
+
+                const deleteSuspect = async () => {
+                    if (!confirm('确定要删除该嫌疑人及其所有数据吗？此操作不可恢复！')) return;
+                    await fetch(`/suspects/${manageSuspectId.value}`, {
+                        method: 'DELETE'
+                    });
+                    showManageModal.value = false;
+                    if (activeSuspect.value && activeSuspect.value.id === manageSuspectId.value) {
+                        activeSuspect.value = null;
+                    }
+                    loadSuspects();
+                };
+
+                const promptVerify = (suspect) => {
+                    verifyTargetSuspect.value = suspect;
+                    verifyPasswordInput.value = '';
+                    showVerifyModal.value = true;
+                };
+
+                const verifyPassword = async () => {
+                    if (!verifyPasswordInput.value) return;
+                    try {
+                        const res = await fetch('/suspects/verify', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                suspect_id: verifyTargetSuspect.value.id,
+                                password: verifyPasswordInput.value
+                            })
+                        });
+                        if (res.ok) {
+                            showVerifyModal.value = false;
+                            activeSuspect.value = verifyTargetSuspect.value;
+                            currentTab.value = 'dashboard';
+                            resetDashboardFilters();
+                        } else {
+                            alert('密码错误');
+                        }
+                    } catch (e) {
+                        alert('验证失败');
+                    }
+                };
+
+                const saveSuspectAndUpload = async () => {
+                    uploading.value = true;
+                    uploadError.value = null;
+                    uploadResult.value = null;
+
+                    try {
+                        let suspectId = modalSuspectId.value;
+
+                        // 1. Create Suspect if needed
+                        if (modalMode.value === 'create') {
+                            if (!modalSuspectName.value || !modalSuspectPassword.value) {
+                                throw new Error("请填写姓名和密码");
+                            }
+                            if (modalSuspectPassword.value.length < 3) {
+                                throw new Error("密码长度至少3位");
+                            }
+
+                            const res = await fetch('/suspects', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    name: modalSuspectName.value,
+                                    password: modalSuspectPassword.value
+                                })
+                            });
+
+                            if (!res.ok) {
+                                const err = await res.json();
+                                throw new Error(err.detail || "创建嫌疑人失败");
+                            }
+                            const data = await res.json();
+                            suspectId = data.id;
+                        }
+
+                        // 2. Upload Files if any
+                        if (modalFiles.value.length > 0) {
+                            const formData = new FormData();
+                            formData.append('suspect_id', suspectId);
+                            modalFiles.value.forEach(file => {
+                                formData.append('files', file);
+                            });
+
+                            const resUpload = await fetch('/upload', {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            if (!resUpload.ok) {
+                                const err = await resUpload.json();
+                                throw new Error(err.detail || "上传失败");
+                            }
+                            uploadResult.value = await resUpload.json();
+
+                            // Check for partial errors
+                            const hasError = uploadResult.value.some(r => r.error);
+                            if (!hasError) {
+                                modalFiles.value = [];
+                                await loadSuspects();
+
+                                const targetSuspect = suspects.value.find(s => s.id === suspectId);
+                                if (targetSuspect) {
+                                    activeSuspect.value = targetSuspect;
+                                    currentTab.value = 'dashboard';
+                                    resetDashboardFilters();
+                                    showSuspectModal.value = false;
+                                }
+                            }
+                        } else if (modalMode.value === 'create') {
+                            // Created but no files
+                            closeSuspectModal();
+                        }
+
+                    } catch (e) {
+                        uploadError.value = e.message;
+                    } finally {
+                        uploading.value = false;
+                    }
+                };
+
+                // --- Data Fetching ---
+
+                const loadDashboardData = async () => {
+                    if (!activeSuspect.value) return;
+
+                    let queryParams = new URLSearchParams();
+                    queryParams.append('suspect_id', activeSuspect.value.id);
+
+                    if (dashboardFilters.value.start_date) queryParams.append('start_date', dashboardFilters.value.start_date);
+                    if (dashboardFilters.value.end_date) queryParams.append('end_date', dashboardFilters.value.end_date);
+                    if (dashboardFilters.value.specific_amount) queryParams.append('specific_amount', dashboardFilters.value.specific_amount);
+                    if (dashboardFilters.value.time_range && dashboardFilters.value.time_range !== 'all') {
+                        queryParams.append('time_range', dashboardFilters.value.time_range);
+                    }
+
+                    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+
+                    // Summary
+                    const resSummary = await fetch(`/stats/summary${queryString}`);
+                    summary.value = await resSummary.json();
+
+                    // Charts
+                    if (currentTab.value === 'dashboard') {
+                        initCharts(queryString);
+                    }
+                };
+
+                const initCharts = async (queryString = '') => {
+                    await nextTick(); // Wait for DOM
+
+                    // Pie Chart
+                    const resPie = await fetch(`/stats/by-counterparty?limit=20${queryString ? '&' + queryString.substring(1) : ''}`);
+                    let dataPie = await resPie.json();
+
+                    if (!dashboardFilters.value.showEmptyCounterparty) {
+                        dataPie = dataPie.filter(item => {
+                            const name = item.name;
+                            return name && name.trim() !== '' && name !== '/' && name !== '-';
+                        });
+                    }
+                    dataPie = dataPie.slice(0, 10);
+
+                    if (pieChart.value) {
+                        if (myPieChart) myPieChart.dispose();
+                        myPieChart = echarts.init(pieChart.value);
+                        myPieChart.setOption({
+                            title: { text: '来往资金分布', left: 'center' },
+                            tooltip: { trigger: 'item' },
+                            series: [
+                                {
+                                    name: '金额',
+                                    type: 'pie',
+                                    radius: '50%',
+                                    data: dataPie,
+                                    emphasis: {
+                                        itemStyle: {
+                                            shadowBlur: 10,
+                                            shadowOffsetX: 0,
+                                            shadowColor: 'rgba(0, 0, 0, 0.5)'
+                                        }
+                                    }
+                                }
+                            ]
+                        });
+                        myPieChart.on('click', (params) => {
+                            filters.value.counterparty = params.name;
+                            filters.value.start_date = dashboardFilters.value.start_date;
+                            filters.value.end_date = dashboardFilters.value.end_date;
+                            currentTab.value = 'transactions';
+                            nextTick(() => {
+                                searchTransactions();
+                            });
+                        });
+                    }
+
+                    // Line Chart
+                    const resLine = await fetch(`/stats/by-date${queryString}`);
+                    const dataLine = await resLine.json();
+
+                    if (lineChart.value) {
+                        if (myLineChart) myLineChart.dispose();
+                        myLineChart = echarts.init(lineChart.value);
+                        myLineChart.setOption({
+                            title: { text: '收支趋势', left: 'center' },
+                            tooltip: { trigger: 'axis' },
+                            legend: { data: ['收入', '支出'], top: 'bottom' },
+                            xAxis: { type: 'category', data: dataLine.dates },
+                            yAxis: { type: 'value' },
+                            series: [
+                                { name: '收入', type: 'line', data: dataLine.income, itemStyle: { color: '#10B981' } },
+                                { name: '支出', type: 'line', data: dataLine.expense, itemStyle: { color: '#EF4444' } }
+                            ]
+                        });
+                        myLineChart.getZr().on('click', (params) => {
+                            const pointInPixel = [params.offsetX, params.offsetY];
+                            if (myLineChart.containPixel('grid', pointInPixel)) {
+                                const xIndex = myLineChart.convertFromPixel({ seriesIndex: 0 }, pointInPixel)[0];
+                                const date = dataLine.dates[xIndex];
+                                if (date) {
+                                    filters.value.start_date = date;
+                                    filters.value.end_date = date;
+                                    filters.value.counterparty = ''; // Clear counterparty
+                                    currentTab.value = 'transactions';
+                                    nextTick(() => {
+                                        searchTransactions();
+                                    });
+                                }
+                            }
+                        });
+                    }
+                };
+
+                const fetchTransactions = async () => {
+                    if (!activeSuspect.value) return;
+
+                    const skip = (page.value - 1) * limit;
+                    let url = `/transactions?skip=${skip}&limit=${limit}&suspect_id=${activeSuspect.value.id}`;
+                    if (filters.value.start_date) url += `&start_date=${filters.value.start_date}`;
+                    if (filters.value.end_date) url += `&end_date=${filters.value.end_date}`;
+                    if (filters.value.counterparty) url += `&counterparty=${filters.value.counterparty}`;
+                    if (filters.value.category) url += `&category=${filters.value.category}`;
+                    if (filters.value.transaction_type) url += `&transaction_type=${filters.value.transaction_type}`;
+                    if (filters.value.method) url += `&method=${filters.value.method}`;
+                    if (filters.value.min_amount) url += `&min_amount=${filters.value.min_amount}`;
+                    if (filters.value.max_amount) url += `&max_amount=${filters.value.max_amount}`;
+
+                    const res = await fetch(url);
+                    const data = await res.json();
+                    transactions.value = data.data;
+                    totalTransactions.value = data.total;
+                    totalAmount.value = data.total_amount;
+                };
+
+                const searchTransactions = () => {
+                    page.value = 1;
+                    fetchTransactions();
+                };
+
+                // Watchers
+                watch(() => dashboardFilters.value.start_date, (newVal) => {
+                    if (datePickers.dashStart && datePickers.dashStart.input && newVal !== datePickers.dashStart.input.value) {
+                        datePickers.dashStart.setDate(newVal, false);
+                    }
+                });
+                watch(() => dashboardFilters.value.end_date, (newVal) => {
+                    if (datePickers.dashEnd && datePickers.dashEnd.input && newVal !== datePickers.dashEnd.input.value) {
+                        datePickers.dashEnd.setDate(newVal, false);
+                    }
+                });
+                watch(() => filters.value.start_date, (newVal) => {
+                    if (datePickers.transStart && datePickers.transStart.input && newVal !== datePickers.transStart.input.value) {
+                        datePickers.transStart.setDate(newVal, false);
+                    }
+                });
+                watch(() => filters.value.end_date, (newVal) => {
+                    if (datePickers.transEnd && datePickers.transEnd.input && newVal !== datePickers.transEnd.input.value) {
+                        datePickers.transEnd.setDate(newVal, false);
+                    }
+                });
+
+                watch(currentTab, (val) => {
+                    if (val === 'dashboard') {
+                        loadDashboardData();
+                        nextTick(() => {
+                            initDashboardPickers();
+                        });
+                    } else if (val === 'transactions') {
+                        fetchTransactions();
+                        nextTick(() => {
+                            initTransactionPickers();
+                        });
+                    }
+                });
+
+                // Helpers
+                const formatMoney = (val) => {
+                    if (val === null || val === undefined) return '0.00';
+                    return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                };
+
+                const formatDate = (str) => {
+                    return str ? str.replace('T', ' ') : '';
+                };
+
+                const resetDashboardFilters = () => {
+                    dashboardFilters.value = {
+                        start_date: '',
+                        end_date: '',
+                        specific_amount: '',
+                        time_range: 'all',
+                        showEmptyCounterparty: true
+                    };
+                    isAllTime.value = true;
+                    loadDashboardData();
+                };
+
+                const onDashboardFilterChange = () => {
+                    isAllTime.value = !dashboardFilters.value.start_date && !dashboardFilters.value.end_date && !dashboardFilters.value.specific_amount;
+                    loadDashboardData();
+                };
+
+                const setTimeRange = (range) => {
+                    dashboardFilters.value.time_range = range;
+                    loadDashboardData();
+                };
+
+                const clearFilters = () => {
+                    filters.value = {
                         start_date: '',
                         end_date: '',
                         counterparty: '',
@@ -769,561 +1244,77 @@
                         method: '',
                         min_amount: '',
                         max_amount: ''
-                    });
-
-                    const dashboardFilters = ref({
-                        start_date: '',
-                        end_date: '',
-                        specific_amount: '',
-                        time_range: 'all', // all, day, night
-                        showEmptyCounterparty: true
-                    });
-
-                    const isAllTime = ref(true);
-
-                    const pieChart = ref(null);
-                    const lineChart = ref(null);
-                    let myPieChart = null;
-                    let myLineChart = null;
-                    const datePickers = {}; // Store picker instances
-
-                    const initDashboardPickers = () => {
-                        // Initialize Flatpickr
-                        const commonConfig = {
-                            locale: "zh",
-                            dateFormat: "Y-m-d",
-                            disableMobile: true, // Use Flatpickr UI on mobile too for consistency
-                            allowInput: true
-                        };
-
-                        // Dashboard Start Date
-                        if (document.querySelector("#dash-start")) {
-                            datePickers.dashStart = flatpickr("#dash-start", {
-                                ...commonConfig,
-                                onChange: (selectedDates, dateStr) => {
-                                    dashboardFilters.value.start_date = dateStr;
-                                    onDashboardFilterChange();
-                                }
-                            });
-                        }
-
-                        // Dashboard End Date
-                        if (document.querySelector("#dash-end")) {
-                            datePickers.dashEnd = flatpickr("#dash-end", {
-                                ...commonConfig,
-                                onChange: (selectedDates, dateStr) => {
-                                    dashboardFilters.value.end_date = dateStr;
-                                    onDashboardFilterChange();
-                                }
-                            });
-                        }
                     };
+                    searchTransactions();
+                };
 
-                    const initTransactionPickers = () => {
-                        // Initialize Flatpickr
-                        const commonConfig = {
-                            locale: "zh",
-                            dateFormat: "Y-m-d",
-                            disableMobile: true, // Use Flatpickr UI on mobile too for consistency
-                            allowInput: true
-                        };
+                const searchCounterparty = (name) => {
+                    filters.value.counterparty = name;
+                    searchTransactions();
+                };
 
-                        // Transactions Start Date
-                        if (document.querySelector("#trans-start")) {
-                            datePickers.transStart = flatpickr("#trans-start", {
-                                ...commonConfig,
-                                onChange: (selectedDates, dateStr) => {
-                                    filters.value.start_date = dateStr;
-                                }
-                            });
-                        }
+                const searchTransactionType = (type) => {
+                    filters.value.transaction_type = type;
+                    searchTransactions();
+                };
 
-                        // Transactions End Date
-                        if (document.querySelector("#trans-end")) {
-                            datePickers.transEnd = flatpickr("#trans-end", {
-                                ...commonConfig,
-                                onChange: (selectedDates, dateStr) => {
-                                    filters.value.end_date = dateStr;
-                                }
-                            });
-                        }
-                    };
+                return {
+                    currentTab,
+                    // Suspect State
+                    suspects,
+                    activeSuspect,
+                    suspectSearch,
+                    showSuspectModal,
+                    modalMode,
+                    modalSuspectName,
+                    modalSuspectPassword,
+                    modalFiles,
+                    loadSuspects,
+                    openSuspectModal,
+                    closeSuspectModal,
+                    handleModalFileChange,
+                    removeModalFile,
+                    saveSuspectAndUpload,
 
-                    onMounted(() => {
-                        loadSuspects();
-                        // If no suspects, stay on upload tab.
-                    });
+                    // Manage & Verify
+                    openManageModal,
+                    deleteFile,
+                    deleteSuspect,
+                    promptVerify,
+                    verifyPassword,
+                    showManageModal,
+                    manageFiles,
+                    showVerifyModal,
+                    verifyPasswordInput,
 
-                    // --- Suspect Methods ---
-                    const loadSuspects = async () => {
-                        let url = '/suspects';
-                        if (suspectSearch.value) {
-                            url += `?search=${suspectSearch.value}`;
-                        }
-                        const res = await fetch(url);
-                        suspects.value = await res.json();
-                    };
-
-                    const openSuspectModal = (mode, suspect = null) => {
-                        modalMode.value = mode;
-                        uploadResult.value = null;
-                        uploadError.value = null;
-                        modalFiles.value = [];
-
-                        if (mode === 'create') {
-                            modalSuspectName.value = '';
-                            modalSuspectPassword.value = '';
-                            modalSuspectId.value = null;
-                        } else if (mode === 'append' && suspect) {
-                            modalSuspectName.value = suspect.name;
-                            modalSuspectId.value = suspect.id;
-                            // For append, we assume authenticated session or simplified flow
-                            modalSuspectPassword.value = '';
-                        }
-                        showSuspectModal.value = true;
-                    };
-
-                    const closeSuspectModal = () => {
-                        showSuspectModal.value = false;
-                        loadSuspects(); // Refresh list
-                    };
-
-                    const handleModalFileChange = (e) => {
-                        const files = Array.from(e.target.files);
-                        modalFiles.value = [...modalFiles.value, ...files];
-                        // Reset input so same files can be selected again if needed
-                        e.target.value = '';
-                    };
-
-                    const removeModalFile = (index) => {
-                        modalFiles.value.splice(index, 1);
-                    };
-
-                    const openManageModal = async (suspect) => {
-                        manageSuspectId.value = suspect.id;
-                        const res = await fetch(`/suspects/${suspect.id}/files`);
-                        manageFiles.value = await res.json();
-                        showManageModal.value = true;
-                    };
-
-                    const deleteFile = async (filename) => {
-                        if (!confirm(`确定要删除文件 "${filename}" 及其所有交易记录吗？`)) return;
-                        await fetch(`/suspects/${manageSuspectId.value}/files?filename=${encodeURIComponent(filename)}`, {
-                            method: 'DELETE'
-                        });
-                        const res = await fetch(`/suspects/${manageSuspectId.value}/files`);
-                        manageFiles.value = await res.json();
-                        loadSuspects();
-                    };
-
-                    const deleteSuspect = async () => {
-                        if (!confirm('确定要删除该嫌疑人及其所有数据吗？此操作不可恢复！')) return;
-                        await fetch(`/suspects/${manageSuspectId.value}`, {
-                            method: 'DELETE'
-                        });
-                        showManageModal.value = false;
-                        if (activeSuspect.value && activeSuspect.value.id === manageSuspectId.value) {
-                            activeSuspect.value = null;
-                        }
-                        loadSuspects();
-                    };
-
-                    const promptVerify = (suspect) => {
-                        verifyTargetSuspect.value = suspect;
-                        verifyPasswordInput.value = '';
-                        showVerifyModal.value = true;
-                    };
-
-                    const verifyPassword = async () => {
-                        if (!verifyPasswordInput.value) return;
-                        try {
-                            const res = await fetch('/suspects/verify', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    suspect_id: verifyTargetSuspect.value.id,
-                                    password: verifyPasswordInput.value
-                                })
-                            });
-                            if (res.ok) {
-                                showVerifyModal.value = false;
-                                activeSuspect.value = verifyTargetSuspect.value;
-                                currentTab.value = 'dashboard';
-                                resetDashboardFilters();
-                            } else {
-                                alert('密码错误');
-                            }
-                        } catch (e) {
-                            alert('验证失败');
-                        }
-                    };
-
-                    const saveSuspectAndUpload = async () => {
-                        uploading.value = true;
-                        uploadError.value = null;
-                        uploadResult.value = null;
-
-                        try {
-                            let suspectId = modalSuspectId.value;
-
-                            // 1. Create Suspect if needed
-                            if (modalMode.value === 'create') {
-                                if (!modalSuspectName.value || !modalSuspectPassword.value) {
-                                    throw new Error("请填写姓名和密码");
-                                }
-                                if (modalSuspectPassword.value.length < 3) {
-                                    throw new Error("密码长度至少3位");
-                                }
-
-                                const res = await fetch('/suspects', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({
-                                        name: modalSuspectName.value,
-                                        password: modalSuspectPassword.value
-                                    })
-                                });
-
-                                if (!res.ok) {
-                                    const err = await res.json();
-                                    throw new Error(err.detail || "创建嫌疑人失败");
-                                }
-                                const data = await res.json();
-                                suspectId = data.id;
-                            }
-
-                            // 2. Upload Files if any
-                            if (modalFiles.value.length > 0) {
-                                const formData = new FormData();
-                                formData.append('suspect_id', suspectId);
-                                modalFiles.value.forEach(file => {
-                                    formData.append('files', file);
-                                });
-
-                                const resUpload = await fetch('/upload', {
-                                    method: 'POST',
-                                    body: formData
-                                });
-
-                                if (!resUpload.ok) {
-                                    const err = await resUpload.json();
-                                    throw new Error(err.detail || "上传失败");
-                                }
-                                uploadResult.value = await resUpload.json();
-
-                                // Check for partial errors
-                                const hasError = uploadResult.value.some(r => r.error);
-                                if (!hasError) {
-                                    modalFiles.value = [];
-                                    await loadSuspects();
-
-                                    const targetSuspect = suspects.value.find(s => s.id === suspectId);
-                                    if (targetSuspect) {
-                                        activeSuspect.value = targetSuspect;
-                                        currentTab.value = 'dashboard';
-                                        resetDashboardFilters();
-                                        showSuspectModal.value = false;
-                                    }
-                                }
-                            } else if (modalMode.value === 'create') {
-                                // Created but no files
-                                closeSuspectModal();
-                            }
-
-                        } catch (e) {
-                            uploadError.value = e.message;
-                        } finally {
-                            uploading.value = false;
-                        }
-                    };
-
-                    // --- Data Fetching ---
-
-                    const loadDashboardData = async () => {
-                        if (!activeSuspect.value) return;
-
-                        let queryParams = new URLSearchParams();
-                        queryParams.append('suspect_id', activeSuspect.value.id);
-
-                        if (dashboardFilters.value.start_date) queryParams.append('start_date', dashboardFilters.value.start_date);
-                        if (dashboardFilters.value.end_date) queryParams.append('end_date', dashboardFilters.value.end_date);
-                        if (dashboardFilters.value.specific_amount) queryParams.append('specific_amount', dashboardFilters.value.specific_amount);
-                        if (dashboardFilters.value.time_range && dashboardFilters.value.time_range !== 'all') {
-                            queryParams.append('time_range', dashboardFilters.value.time_range);
-                        }
-
-                        const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-
-                        // Summary
-                        const resSummary = await fetch(`/stats/summary${queryString}`);
-                        summary.value = await resSummary.json();
-
-                        // Charts
-                        if (currentTab.value === 'dashboard') {
-                            initCharts(queryString);
-                        }
-                    };
-
-                    const initCharts = async (queryString = '') => {
-                        await nextTick(); // Wait for DOM
-
-                        // Pie Chart
-                        const resPie = await fetch(`/stats/by-counterparty?limit=20${queryString ? '&' + queryString.substring(1) : ''}`);
-                        let dataPie = await resPie.json();
-
-                        if (!dashboardFilters.value.showEmptyCounterparty) {
-                            dataPie = dataPie.filter(item => {
-                                const name = item.name;
-                                return name && name.trim() !== '' && name !== '/' && name !== '-';
-                            });
-                        }
-                        dataPie = dataPie.slice(0, 10);
-
-                        if (pieChart.value) {
-                            if (myPieChart) myPieChart.dispose();
-                            myPieChart = echarts.init(pieChart.value);
-                            myPieChart.setOption({
-                                title: { text: '来往资金分布', left: 'center' },
-                                tooltip: { trigger: 'item' },
-                                series: [
-                                    {
-                                        name: '金额',
-                                        type: 'pie',
-                                        radius: '50%',
-                                        data: dataPie,
-                                        emphasis: {
-                                            itemStyle: {
-                                                shadowBlur: 10,
-                                                shadowOffsetX: 0,
-                                                shadowColor: 'rgba(0, 0, 0, 0.5)'
-                                            }
-                                        }
-                                    }
-                                ]
-                            });
-                            myPieChart.on('click', (params) => {
-                                filters.value.counterparty = params.name;
-                                filters.value.start_date = dashboardFilters.value.start_date;
-                                filters.value.end_date = dashboardFilters.value.end_date;
-                                currentTab.value = 'transactions';
-                                nextTick(() => {
-                                    searchTransactions();
-                                });
-                            });
-                        }
-
-                        // Line Chart
-                        const resLine = await fetch(`/stats/by-date${queryString}`);
-                        const dataLine = await resLine.json();
-
-                        if (lineChart.value) {
-                            if (myLineChart) myLineChart.dispose();
-                            myLineChart = echarts.init(lineChart.value);
-                            myLineChart.setOption({
-                                title: { text: '收支趋势', left: 'center' },
-                                tooltip: { trigger: 'axis' },
-                                legend: { data: ['收入', '支出'], top: 'bottom' },
-                                xAxis: { type: 'category', data: dataLine.dates },
-                                yAxis: { type: 'value' },
-                                series: [
-                                    { name: '收入', type: 'line', data: dataLine.income, itemStyle: { color: '#10B981' } },
-                                    { name: '支出', type: 'line', data: dataLine.expense, itemStyle: { color: '#EF4444' } }
-                                ]
-                            });
-                            myLineChart.getZr().on('click', (params) => {
-                                const pointInPixel = [params.offsetX, params.offsetY];
-                                if (myLineChart.containPixel('grid', pointInPixel)) {
-                                    const xIndex = myLineChart.convertFromPixel({ seriesIndex: 0 }, pointInPixel)[0];
-                                    const date = dataLine.dates[xIndex];
-                                    if (date) {
-                                        filters.value.start_date = date;
-                                        filters.value.end_date = date;
-                                        filters.value.counterparty = ''; // Clear counterparty
-                                        currentTab.value = 'transactions';
-                                        nextTick(() => {
-                                            searchTransactions();
-                                        });
-                                    }
-                                }
-                            });
-                        }
-                    };
-
-                    const fetchTransactions = async () => {
-                        if (!activeSuspect.value) return;
-
-                        const skip = (page.value - 1) * limit;
-                        let url = `/transactions?skip=${skip}&limit=${limit}&suspect_id=${activeSuspect.value.id}`;
-                        if (filters.value.start_date) url += `&start_date=${filters.value.start_date}`;
-                        if (filters.value.end_date) url += `&end_date=${filters.value.end_date}`;
-                        if (filters.value.counterparty) url += `&counterparty=${filters.value.counterparty}`;
-                        if (filters.value.category) url += `&category=${filters.value.category}`;
-                        if (filters.value.transaction_type) url += `&transaction_type=${filters.value.transaction_type}`;
-                        if (filters.value.method) url += `&method=${filters.value.method}`;
-                        if (filters.value.min_amount) url += `&min_amount=${filters.value.min_amount}`;
-                        if (filters.value.max_amount) url += `&max_amount=${filters.value.max_amount}`;
-
-                        const res = await fetch(url);
-                        const data = await res.json();
-                        transactions.value = data.data;
-                        totalTransactions.value = data.total;
-                        totalAmount.value = data.total_amount;
-                    };
-
-                    const searchTransactions = () => {
-                        page.value = 1;
-                        fetchTransactions();
-                    };
-
-                    // Watchers
-                    watch(() => dashboardFilters.value.start_date, (newVal) => {
-                        if (datePickers.dashStart && datePickers.dashStart.input && newVal !== datePickers.dashStart.input.value) {
-                            datePickers.dashStart.setDate(newVal, false);
-                        }
-                    });
-                    watch(() => dashboardFilters.value.end_date, (newVal) => {
-                        if (datePickers.dashEnd && datePickers.dashEnd.input && newVal !== datePickers.dashEnd.input.value) {
-                            datePickers.dashEnd.setDate(newVal, false);
-                        }
-                    });
-                    watch(() => filters.value.start_date, (newVal) => {
-                        if (datePickers.transStart && datePickers.transStart.input && newVal !== datePickers.transStart.input.value) {
-                            datePickers.transStart.setDate(newVal, false);
-                        }
-                    });
-                    watch(() => filters.value.end_date, (newVal) => {
-                        if (datePickers.transEnd && datePickers.transEnd.input && newVal !== datePickers.transEnd.input.value) {
-                            datePickers.transEnd.setDate(newVal, false);
-                        }
-                    });
-
-                    watch(currentTab, (val) => {
-                        if (val === 'dashboard') {
-                            loadDashboardData();
-                            nextTick(() => {
-                                initDashboardPickers();
-                            });
-                        } else if (val === 'transactions') {
-                            fetchTransactions();
-                            nextTick(() => {
-                                initTransactionPickers();
-                            });
-                        }
-                    });
-
-                    // Helpers
-                    const formatMoney = (val) => {
-                        if (val === null || val === undefined) return '0.00';
-                        return val.toFixed(2);
-                    };
-
-                    const formatDate = (str) => {
-                        return str ? str.replace('T', ' ') : '';
-                    };
-
-                    const resetDashboardFilters = () => {
-                        dashboardFilters.value = {
-                            start_date: '',
-                            end_date: '',
-                            specific_amount: '',
-                            time_range: 'all',
-                            showEmptyCounterparty: true
-                        };
-                        isAllTime.value = true;
-                        loadDashboardData();
-                    };
-
-                    const onDashboardFilterChange = () => {
-                        isAllTime.value = !dashboardFilters.value.start_date && !dashboardFilters.value.end_date && !dashboardFilters.value.specific_amount;
-                        loadDashboardData();
-                    };
-
-                    const setTimeRange = (range) => {
-                        dashboardFilters.value.time_range = range;
-                        loadDashboardData();
-                    };
-
-                    const clearFilters = () => {
-                        filters.value = {
-                            start_date: '',
-                            end_date: '',
-                            counterparty: '',
-                            category: '',
-                            transaction_type: '',
-                            method: '',
-                            min_amount: '',
-                            max_amount: ''
-                        };
-                        searchTransactions();
-                    };
-
-                    const searchCounterparty = (name) => {
-                        filters.value.counterparty = name;
-                        searchTransactions();
-                    };
-
-                    const searchTransactionType = (type) => {
-                        filters.value.transaction_type = type;
-                        searchTransactions();
-                    };
-
-                    return {
-                        currentTab,
-                        // Suspect State
-                        suspects,
-                        activeSuspect,
-                        suspectSearch,
-                        showSuspectModal,
-                        modalMode,
-                        modalSuspectName,
-                        modalSuspectPassword,
-                        modalFiles,
-                        loadSuspects,
-                        openSuspectModal,
-                        closeSuspectModal,
-                        handleModalFileChange,
-                        removeModalFile,
-                        saveSuspectAndUpload,
-
-                        // Manage & Verify
-                        openManageModal,
-                        deleteFile,
-                        deleteSuspect,
-                        promptVerify,
-                        verifyPassword,
-                        showManageModal,
-                        manageFiles,
-                        showVerifyModal,
-                        verifyPasswordInput,
-
-                        uploading,
-                        uploadResult,
-                        uploadError,
-                        summary,
-                        transactions,
-                        totalTransactions,
-                        totalAmount,
-                        page,
-                        limit,
-                        filters,
-                        pieChart,
-                        lineChart,
-                        dashboardFilters,
-                        isAllTime,
-                        resetDashboardFilters,
-                        onDashboardFilterChange,
-                        setTimeRange,
-                        formatMoney,
-                        formatDate,
-                        fetchTransactions,
-                        searchTransactions,
-                        clearFilters,
-                        searchCounterparty,
-                        searchTransactionType
-                    };
-                }
-            }).mount('#app');
-        </script>
+                    uploading,
+                    uploadResult,
+                    uploadError,
+                    summary,
+                    transactions,
+                    totalTransactions,
+                    totalAmount,
+                    page,
+                    limit,
+                    filters,
+                    pieChart,
+                    lineChart,
+                    dashboardFilters,
+                    isAllTime,
+                    resetDashboardFilters,
+                    onDashboardFilterChange,
+                    setTimeRange,
+                    formatMoney,
+                    formatDate,
+                    fetchTransactions,
+                    searchTransactions,
+                    clearFilters,
+                    searchCounterparty,
+                    searchTransactionType
+                };
+            }
+        }).mount('#app');
+    </script>
 </body>
 
 </html>
