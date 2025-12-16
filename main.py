@@ -50,7 +50,7 @@ class SuspectRead(BaseModel):
         from_attributes = True
 
 @app.get("/favicon.ico", include_in_schema=False)
-async def favicon():
+def favicon():
     return FileResponse("static/favicon.ico")
 
 @app.get("/")
@@ -96,7 +96,7 @@ def read_suspects(search: Optional[str] = None, db: Session = Depends(database.g
     return results
 
 @app.post("/upload")
-async def upload_file(
+def upload_file(
     suspect_id: int = Form(...),
     files: List[UploadFile] = File(...), 
     db: Session = Depends(database.get_db)
@@ -381,8 +381,46 @@ def get_stats_by_date(
         "expense": [data[d]["expense"] for d in sorted_dates]
     }
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+# Create a limited thread pool specifically for AI tasks
+# This prevents AI requests from starving the main thread pool used for uploads and other operations
+# Local LLM is CPU/VRAM bound, so limiting concurrency is also good for performance
+ai_executor = ThreadPoolExecutor(max_workers=2)
+
+def call_ollama_sync(prompt, ollama_host):
+    # Ensure scheme is present
+    if not ollama_host.startswith("http://") and not ollama_host.startswith("https://"):
+        ollama_host = "http://" + ollama_host
+        
+    # Fix for Windows: cannot connect to 0.0.0.0 directly
+    if "0.0.0.0" in ollama_host:
+        ollama_host = ollama_host.replace("0.0.0.0", "127.0.0.1")
+        
+    ollama_url = f"{ollama_host}/api/generate"
+    
+    payload = {
+        "model": "qwen3:1.7b",
+        "prompt": prompt,
+        "stream": False
+    }
+    
+    try:
+        # Increased timeout to 120s because queuing might happen
+        resp = requests.post(ollama_url, json=payload, timeout=120)
+        if resp.status_code == 200:
+            raw_response = resp.json().get("response", "AI 分析服务暂无响应")
+            # Clean <think> tags
+            cleaned_response = re.sub(r'<think>.*?</think>', '', raw_response, flags=re.DOTALL).strip()
+            return {"success": True, "analysis": cleaned_response}
+        else:
+            return {"success": False, "error": f"AI 服务响应错误: {resp.status_code}"}
+    except Exception as e:
+        return {"success": False, "error": f"AI 分析连接失败: {str(e)}"}
+
 @app.get("/stats/ai-analysis")
-def get_ai_analysis(
+async def get_ai_analysis(
     suspect_id: int,
     start_date: Optional[str] = None, 
     end_date: Optional[str] = None,
@@ -459,7 +497,7 @@ def get_ai_analysis(
     day_inc, day_exp = get_period_stats("day")
     night_inc, night_exp = get_period_stats("night")
 
-    # 3. Call Ollama
+    # 3. Call Ollama (Async via Executor)
     prompt = f"""
     作为一名金融分析专家，请根据以下嫌疑人的交易数据进行简要分析，指出可能的可疑点。
     
@@ -472,43 +510,20 @@ def get_ai_analysis(
     请用简练、犀利的口吻（类似于侦探或审计专家），以气泡发言的形式，简短地（100字以内）给出你的核心点评和风险提示。关注夜间大额交易或频繁交易、以及异常的交易对象。
     """
     
-    try:
-        ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-        
-        # Ensure scheme is present
-        if not ollama_host.startswith("http://") and not ollama_host.startswith("https://"):
-            ollama_host = "http://" + ollama_host
-            
-        # Fix for Windows: cannot connect to 0.0.0.0 directly
-        if "0.0.0.0" in ollama_host:
-            ollama_host = ollama_host.replace("0.0.0.0", "127.0.0.1")
-            
-        ollama_url = f"{ollama_host}/api/generate"
-        
-        payload = {
-            "model": "qwen3:1.7b",
-            "prompt": prompt,
-            "stream": False
-        }
-        resp = requests.post(ollama_url, json=payload, timeout=50)
-        if resp.status_code == 200:
-            raw_response = resp.json().get("response", "AI 分析服务暂无响应")
-            
-            # Clean <think> tags
-            cleaned_response = re.sub(r'<think>.*?</think>', '', raw_response, flags=re.DOTALL).strip()
-            
-            # Save to cache
-            suspect.ai_analysis = cleaned_response
-            suspect.analysis_signature = current_signature
-            db.commit()
-            
-            return {"analysis": cleaned_response}
-        else:
-            print(f"Ollama Error: {resp.text}")
-            return {"analysis": f"AI 服务响应错误: {resp.status_code}"}
-    except Exception as e:
-        print(f"Ollama Exception: {e}")
-        return {"analysis": f"AI 分析连接失败: {str(e)}"}
+    ollama_host = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    
+    # Run in separate thread pool to avoid blocking main loop and other requests
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(ai_executor, call_ollama_sync, prompt, ollama_host)
+    
+    if result["success"]:
+        # Save to cache
+        suspect.ai_analysis = result["analysis"]
+        suspect.analysis_signature = current_signature
+        db.commit()
+        return {"analysis": result["analysis"]}
+    else:
+        return {"analysis": result["error"]}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8180, reload=True)
