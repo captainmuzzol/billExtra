@@ -1,12 +1,13 @@
 from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import RedirectResponse, FileResponse
+from fastapi.responses import RedirectResponse, FileResponse, HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import List, Optional
 import shutil
 import os
+import mimetypes
 import uvicorn
 import requests
 import re
@@ -30,7 +31,17 @@ app.add_middleware(
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Global state for report proxy
+REPORT_CONTEXT = {
+    "root_dir": None,
+    "main_file": None
+}
+
 # Pydantic Models
+class ReportPathRequest(BaseModel):
+    file_path: Optional[str] = None
+    search_name: Optional[str] = None
+
 class SuspectCreate(BaseModel):
     name: str
     password: str
@@ -524,6 +535,172 @@ async def get_ai_analysis(
         return {"analysis": result["analysis"]}
     else:
         return {"analysis": result["error"]}
+
+@app.post("/api/set_report_path")
+def set_report_path(request: ReportPathRequest):
+    path = None
+    
+    # Mode 1: Search by name (Drag & Drop)
+    if request.search_name:
+        search_roots = ['.'] # Search current directory
+        found_path = None
+        
+        # Helper to find file/dir
+        for root_dir in search_roots:
+            if found_path: break
+            # Walk with depth limit
+            for root, dirs, files in os.walk(root_dir):
+                # Calculate depth
+                depth = root[len(root_dir):].count(os.sep)
+                if depth > 3: # Limit depth
+                    # Don't recurse further
+                    dirs[:] = []
+                    continue
+                
+                # Check directories
+                if request.search_name in dirs:
+                    found_path = os.path.join(root, request.search_name)
+                    break
+                
+                # Check files
+                if request.search_name in files:
+                    found_path = os.path.join(root, request.search_name)
+                    break
+        
+        if found_path:
+            path = os.path.abspath(found_path)
+        else:
+             raise HTTPException(status_code=404, detail=f"在服务器目录中未找到: {request.search_name}，请尝试手动输入完整路径")
+             
+    # Mode 2: Direct path
+    elif request.file_path:
+        path = request.file_path.strip()
+        # Remove quotes if user copied as path
+        if (path.startswith('"') and path.endswith('"')) or (path.startswith("'") and path.endswith("'")):
+            path = path[1:-1]
+    else:
+        raise HTTPException(status_code=400, detail="Missing file_path or search_name")
+
+    if not os.path.exists(path):
+         raise HTTPException(status_code=400, detail="路径不存在")
+    
+    if os.path.isdir(path):
+        # Try to find main html file
+        try:
+            candidates = [f for f in os.listdir(path) if f.lower().endswith('.html')]
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"无法读取目录: {str(e)}")
+
+        main_file = None
+        # Priority 1: Contains "取证分析报告"
+        for f in candidates:
+            if "取证分析报告" in f:
+                main_file = f
+                break
+        # Priority 2: index.html
+        if not main_file and "index.html" in candidates:
+            main_file = "index.html"
+        # Priority 3: First html file
+        if not main_file and candidates:
+            main_file = candidates[0]
+            
+        if not main_file:
+            raise HTTPException(status_code=400, detail="该目录下未找到 HTML 报告文件")
+            
+        REPORT_CONTEXT["root_dir"] = path
+        REPORT_CONTEXT["main_file"] = main_file
+    else:
+        REPORT_CONTEXT["root_dir"] = os.path.dirname(path)
+        REPORT_CONTEXT["main_file"] = os.path.basename(path)
+    
+    return {"status": "ok", "filename": REPORT_CONTEXT["main_file"]}
+
+@app.get("/report_proxy/{file_path:path}")
+def report_proxy(file_path: str):
+    if not REPORT_CONTEXT["root_dir"]:
+        raise HTTPException(status_code=400, detail="Report path not set")
+    
+    # Security check
+    full_path = os.path.abspath(os.path.join(REPORT_CONTEXT["root_dir"], file_path))
+    if not full_path.startswith(os.path.abspath(REPORT_CONTEXT["root_dir"])):
+         raise HTTPException(status_code=403, detail="Access denied")
+    
+    if not os.path.exists(full_path):
+        raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        
+    mime_type, _ = mimetypes.guess_type(full_path)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+    
+    # Check if HTML
+    is_html = mime_type.startswith("text/html") or file_path.lower().endswith(('.html', '.htm'))
+    
+    if is_html:
+        try:
+            with open(full_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+                
+            # Injection script
+            script = """
+            <script>
+            (function() {
+                // BillExtra Investigation Bridge
+                if (window.__billExtraBridgeLoaded) return;
+                window.__billExtraBridgeLoaded = true;
+                
+                console.log("BillExtra Bridge Active");
+                const channel = new BroadcastChannel('bill_investigation_channel');
+
+                document.addEventListener('click', function(e) {
+                    let target = e.target;
+                    
+                    // Traverse up to find a message container (often 'm-message' or 'tr')
+                    let container = target.closest('.m-message') || target.closest('tr') || target.closest('.contentitem');
+                    
+                    if (container) {
+                       // Find any time string inside this container
+                       // Regex for date time: YYYY-MM-DD HH:MM:SS
+                       const timeRegex = /\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/;
+                       const match = container.innerText.match(timeRegex);
+                       
+                       if (match) {
+                           console.log("Sending time:", match[0]);
+                           channel.postMessage({type: 'time_sync', time: match[0]});
+                           
+                           // Visual feedback
+                           let originalBg = container.style.backgroundColor;
+                           let originalTransition = container.style.transition;
+                           
+                           container.style.transition = 'background-color 0.3s';
+                           container.style.backgroundColor = 'rgba(250, 204, 21, 0.4)'; // Yellow highlight
+                           
+                           setTimeout(() => {
+                               container.style.backgroundColor = originalBg;
+                               setTimeout(() => {
+                                   container.style.transition = originalTransition;
+                               }, 300);
+                           }, 800);
+                       }
+                    }
+                });
+            })();
+            </script>
+            """
+            
+            # Insert before </head> or </body>
+            if "</head>" in content:
+                content = content.replace("</head>", script + "</head>")
+            elif "</body>" in content:
+                content = content.replace("</body>", script + "</body>")
+            else:
+                content += script
+                
+            return HTMLResponse(content=content)
+        except Exception as e:
+             print(f"Error reading HTML {full_path}: {e}")
+             return FileResponse(full_path)
+    else:
+        return FileResponse(full_path)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8180, reload=True)

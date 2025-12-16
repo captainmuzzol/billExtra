@@ -33,6 +33,60 @@
             opacity: 0;
         }
 
+        /* Custom Animations */
+        @keyframes subtle-pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.95;
+                transform: scale(1.02);
+            }
+        }
+
+        .animate-pulse-slow {
+            animation: subtle-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+
+        @keyframes bounce-slight {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-2px);
+            }
+        }
+
+        .animate-bounce-slight {
+            animation: bounce-slight 2s ease-in-out infinite;
+        }
+
+        @keyframes breathe-blue {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+                background-color: rgba(238, 242, 255, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 10px 4px rgba(99, 102, 241, 0.2);
+                background-color: rgba(224, 231, 255, 0.8);
+                border-color: rgba(99, 102, 241, 0.6);
+            }
+        }
+
+        .animate-breathe-blue {
+            animation: breathe-blue 3s infinite ease-in-out;
+        }
+
         /* Markdown Styles */
         .markdown-body ul {
             list-style-type: disc;
@@ -605,14 +659,25 @@
                                 <span class="w-1 h-6 bg-blue-600 rounded-full"></span>
                                 交易明细查询
                             </h2>
-                            <button @click="clearFilters"
-                                class="text-sm text-gray-500 hover:text-red-600 flex items-center gap-1 transition-colors">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M6 18L18 6M6 6l12 12"></path>
-                                </svg>
-                                清空筛选
-                            </button>
+                            <div class="flex gap-3">
+                                <button @click="openInvestigationModal"
+                                    class="text-sm text-indigo-500 border border-indigo-200 bg-indigo-50/50 rounded px-3 py-1 hover:text-indigo-600 hover:font-bold hover:border-indigo-600 hover:bg-indigo-100 flex items-center gap-1 transition-all animate-breathe-blue">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M10 21h7a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v11m0 5l4.879-4.879m0 0a3 3 0 104.243-4.242 3 3 0 00-4.243 4.242z">
+                                        </path>
+                                    </svg>
+                                    取证联动
+                                </button>
+                                <button @click="clearFilters"
+                                    class="text-sm text-red-400 border border-black rounded px-3 py-1 hover:text-red-600 hover:font-bold hover:border-red-600 hover:bg-red-50 flex items-center gap-1 transition-all">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                    清空筛选
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Filters -->
@@ -785,6 +850,254 @@
         <footer class="text-center text-xs text-gray-400 py-6 mt-8">
             <p>&copy; 2026 账单神探 - 许钦滔</p>
         </footer>
+        <!-- Investigation Report Overlay -->
+        <transition enter-active-class="transition duration-500 ease-out"
+            enter-from-class="transform translate-y-full opacity-0" enter-to-class="transform translate-y-0 opacity-100"
+            leave-active-class="transition duration-300 ease-in" leave-from-class="transform translate-y-0 opacity-100"
+            leave-to-class="transform translate-y-full opacity-0">
+            <div v-if="showReportOverlay"
+                :class="['fixed inset-0 z-40 transition-all duration-300 flex flex-col', isReportMinimized ? 'pointer-events-none' : 'bg-black/50 backdrop-blur-sm']">
+                <!-- Overlay Container -->
+                <div
+                    :class="['bg-white shadow-2xl transition-all duration-300 flex flex-col overflow-hidden', 
+                        isReportMinimized ? 'absolute bottom-4 right-4 w-96 h-16 rounded-xl border border-gray-200 pointer-events-auto' : 'absolute top-4 left-4 right-4 bottom-4 rounded-xl']">
+
+                    <!-- Header / Control Bar -->
+                    <div
+                        class="h-12 bg-gray-50 border-b border-gray-200 flex items-center justify-between px-4 shrink-0">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-gray-700 flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                取证报告
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <!-- Toggle View Button (Minimize/Restore) -->
+                            <button @click="toggleReportView"
+                                class="text-sm px-4 py-2 rounded-lg transition-all flex items-center gap-2 shadow-lg hover:scale-105 active:scale-95 animate-pulse-slow"
+                                :class="!isReportMinimized 
+                                    ? 'bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-indigo-500/30 border border-transparent font-bold' 
+                                    : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-emerald-500/30 border border-transparent font-bold'"
+                                title="切换视图">
+                                <span v-if="!isReportMinimized" class="flex items-center gap-1">
+                                    <svg class="w-5 h-5 animate-bounce-slight" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                    回到账单
+                                </span>
+                                <span v-else class="flex items-center gap-1">
+                                    <svg class="w-5 h-5 animate-bounce-slight" fill="none" stroke="currentColor"
+                                        viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M5 15l7-7 7 7"></path>
+                                    </svg>
+                                    查看报告
+                                </span>
+                            </button>
+
+                            <!-- Open in New Tab -->
+                            <button v-if="!isReportMinimized" @click="openReportInNewTab"
+                                class="text-sm px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-1 shadow-sm bg-white"
+                                title="在新标签页打开">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14">
+                                    </path>
+                                </svg>
+                                拆开显示
+                            </button>
+
+                            <!-- Close -->
+                            <button @click="closeReportOverlay"
+                                class="text-sm px-3 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 transition-colors flex items-center gap-1 shadow-sm bg-white ml-2"
+                                title="关闭报告">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                                退出
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Iframe Content -->
+                    <div class="flex-1 relative bg-white" v-show="!isReportMinimized">
+                        <iframe :src="reportUrl" class="w-full h-full border-none"></iframe>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Investigation Path Modal -->
+        <transition name="fade">
+            <div v-if="showInvestigationModal"
+                class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                <!-- ... modal content ... -->
+                <div
+                    class="bg-white rounded-2xl shadow-2xl w-full max-w-lg transform transition-all scale-100 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2">
+                                </path>
+                            </svg>
+                            取证报告联动
+                        </h3>
+                        <button @click="showInvestigationModal = false" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M6 18L18 6M6 6l12 12">
+                                </path>
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="p-6">
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-3 mb-4 flex items-start gap-3">
+                            <svg class="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" fill="none" stroke="currentColor"
+                                viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <p class="text-sm text-indigo-800">
+                                开启联动后，在弹出的取证报告窗口中点击任意聊天记录时间，本页面将自动筛选显示该时间前后的账单。
+                            </p>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-2">选择取证报告</label>
+
+                            <!-- Drop Zone -->
+                            <div @dragover.prevent="dragOverReport = true" @dragleave.prevent="dragOverReport = false"
+                                @drop.prevent="handleReportDrop"
+                                :class="['border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer mb-3', 
+                                    dragOverReport ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-400 hover:bg-gray-50']">
+                                <div class="flex flex-col items-center gap-2 pointer-events-none">
+                                    <div
+                                        class="w-12 h-12 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 mb-1">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
+                                            </path>
+                                        </svg>
+                                    </div>
+                                    <p class="text-sm font-medium text-gray-700">拖入 HTML 文件或报告文件夹</p>
+                                    <p class="text-xs text-gray-500">将自动在服务器目录中搜索同名文件/文件夹</p>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <div class="absolute inset-0 flex items-center" aria-hidden="true">
+                                    <div class="w-full border-t border-gray-200"></div>
+                                </div>
+                                <div class="relative flex justify-center text-xs uppercase mb-3">
+                                    <span class="bg-white px-2 text-gray-500">或者手动输入路径</span>
+                                </div>
+                            </div>
+
+                            <div class="relative">
+                                <input type="text" v-model="investigationPath"
+                                    placeholder="/Users/username/Desktop/case/report.html"
+                                    class="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono text-sm">
+                                <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none"
+                                    stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z">
+                                    </path>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <div class="flex justify-end gap-3 mt-6">
+                            <button @click="showInvestigationModal = false"
+                                class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm transition-colors">取消</button>
+                            <button @click="startInvestigation"
+                                class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14">
+                                    </path>
+                                </svg>
+                                打开报告并联动
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Linkage Promo Popup -->
+        <transition enter-active-class="transition duration-500 ease-out"
+            enter-from-class="transform translate-y-full opacity-0" enter-to-class="transform translate-y-0 opacity-100"
+            leave-active-class="transition duration-300 ease-in" leave-from-class="transform translate-y-0 opacity-100"
+            leave-to-class="transform translate-y-full opacity-0">
+            <div v-if="showLinkagePromo"
+                class="fixed bottom-10 right-10 z-[60] bg-white p-6 rounded-2xl shadow-2xl border border-indigo-100 max-w-sm flex flex-col gap-4">
+                <div class="flex items-start gap-4">
+                    <div class="bg-indigo-100 p-3 rounded-full shrink-0">
+                        <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-gray-800 text-lg mb-1">启用取证联动？</h3>
+                        <p class="text-sm text-gray-600 leading-relaxed">
+                            “取证联动”可帮助您一边查看手机取证报告一边查看账单，是否启用？
+                        </p>
+                    </div>
+                </div>
+                <div class="flex gap-3 justify-end">
+                    <button @click="dismissLinkagePromo"
+                        class="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                        稍后
+                    </button>
+                    <button @click="enableLinkageFromPromo"
+                        class="px-5 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 transition-all">
+                        立即启用
+                    </button>
+                </div>
+            </div>
+        </transition>
+
+        <!-- Guidance Toast -->
+        <transition enter-active-class="transition duration-500 ease-out"
+            enter-from-class="transform -translate-y-4 opacity-0" enter-to-class="transform translate-y-0 opacity-100"
+            leave-active-class="transition duration-300 ease-in" leave-from-class="transform translate-y-0 opacity-100"
+            leave-to-class="transform -translate-y-4 opacity-0">
+            <div v-if="showGuidanceToast"
+                class="fixed top-24 right-5 z-50 bg-slate-800/95 backdrop-blur text-white px-5 py-4 rounded-xl shadow-2xl max-w-xs border border-white/10 flex items-start gap-3">
+                <div class="text-2xl">🕵️‍♂️</div>
+                <div class="flex-1">
+                    <div class="font-bold text-sm mb-1">账单神探已就绪</div>
+                    <div class="text-xs text-white/80 leading-relaxed">
+                        点击取证报告中的聊天记录时间，账单将自动跳转同步。
+                    </div>
+                </div>
+                <button @click="showGuidanceToast = false" class="text-white/50 hover:text-white transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12">
+                        </path>
+                    </svg>
+                </button>
+            </div>
+        </transition>
+
+        <!-- Feedback Toast -->
+        <transition enter-active-class="transition duration-300 ease-out"
+            enter-from-class="transform translate-y-4 opacity-0" enter-to-class="transform translate-y-0 opacity-100"
+            leave-active-class="transition duration-200 ease-in" leave-from-class="transform translate-y-0 opacity-100"
+            leave-to-class="transform translate-y-4 opacity-0">
+            <div v-if="feedbackToast.show"
+                class="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 bg-emerald-500/95 backdrop-blur text-white px-5 py-2.5 rounded-full shadow-lg border border-emerald-400/20 font-medium text-sm flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                {{ feedbackToast.message }}
+            </div>
+        </transition>
     </div>
 
     <script>
@@ -849,6 +1162,12 @@
                 const loadingAi = ref(false);
 
                 const isAllTime = ref(true);
+
+                // Guidance & Feedback Toasts
+                const showGuidanceToast = ref(false);
+                const feedbackToast = ref({ show: false, message: '' });
+                const showLinkagePromo = ref(false);
+                let linkagePromoTimer = null;
 
                 const pieChart = ref(null);
                 const lineChart = ref(null);
@@ -921,6 +1240,15 @@
                 onMounted(() => {
                     loadSuspects();
                     // If no suspects, stay on upload tab.
+
+                    // Listen for investigation reports
+                    const channel = new BroadcastChannel('bill_investigation_channel');
+                    channel.onmessage = (event) => {
+                        if (event.data && event.data.type === 'time_sync' && event.data.time) {
+                            console.log('Received time sync:', event.data.time);
+                            syncTimeFromReport(event.data.time);
+                        }
+                    };
                 });
 
                 // --- Suspect Methods ---
@@ -1112,11 +1440,16 @@
                                     currentTab.value = 'dashboard';
                                     resetDashboardFilters();
                                     showSuspectModal.value = false;
+
+                                    if (modalMode.value === 'create') {
+                                        triggerLinkagePromo();
+                                    }
                                 }
                             }
                         } else if (modalMode.value === 'create') {
                             // Created but no files
                             closeSuspectModal();
+                            // We don't trigger promo here because no suspect is active yet
                         }
 
                     } catch (e) {
@@ -1372,6 +1705,166 @@
                     searchTransactions();
                 };
 
+                // --- Investigation Logic ---
+                const showInvestigationModal = ref(false);
+                const investigationPath = ref('');
+                const showReportOverlay = ref(false);
+                const reportUrl = ref('');
+                const isReportMinimized = ref(false);
+
+                const openInvestigationModal = () => {
+                    showInvestigationModal.value = true;
+                };
+
+                const startInvestigation = async () => {
+                    if (!investigationPath.value) {
+                        alert('请输入报告路径或拖入文件');
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/set_report_path', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ file_path: investigationPath.value })
+                        });
+                        if (!res.ok) {
+                            const err = await res.json();
+                            throw new Error(err.detail || '设置报告路径失败');
+                        }
+                        const data = await res.json();
+
+                        // Set URL and show overlay
+                        reportUrl.value = `/report_proxy/${data.filename}`;
+                        showReportOverlay.value = true;
+                        isReportMinimized.value = false;
+
+                        // Show Guidance Toast
+                        showGuidanceToast.value = true;
+                        setTimeout(() => {
+                            showGuidanceToast.value = false;
+                        }, 10000);
+
+                        showInvestigationModal.value = false;
+                    } catch (e) {
+                        alert('打开报告失败: ' + e.message);
+                    }
+                };
+
+                const enableLinkageFromPromo = () => {
+                    showLinkagePromo.value = false;
+                    if (linkagePromoTimer) clearTimeout(linkagePromoTimer);
+
+                    // Switch to transactions tab first to show the button context
+                    currentTab.value = 'transactions';
+                    nextTick(() => {
+                        openInvestigationModal();
+                    });
+                };
+
+                const dismissLinkagePromo = () => {
+                    showLinkagePromo.value = false;
+                    if (linkagePromoTimer) clearTimeout(linkagePromoTimer);
+                };
+
+                const triggerLinkagePromo = () => {
+                    showLinkagePromo.value = true;
+                    if (linkagePromoTimer) clearTimeout(linkagePromoTimer);
+                    linkagePromoTimer = setTimeout(() => {
+                        showLinkagePromo.value = false;
+                    }, 20000);
+                };
+
+                // Drag & Drop for Report
+                const dragOverReport = ref(false);
+
+                const handleReportDrop = async (e) => {
+                    dragOverReport.value = false;
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        const file = files[0];
+                        // Try smart search by name
+                        try {
+                            const res = await fetch('/api/set_report_path', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ search_name: file.name })
+                            });
+
+                            if (!res.ok) {
+                                // If search fails, user must enter path manually (or we show error)
+                                const err = await res.json();
+                                alert('无法自动定位文件: ' + err.detail);
+                                return;
+                            }
+
+                            const data = await res.json();
+                            // Success! Open it directly
+                            reportUrl.value = `/report_proxy/${data.filename}`;
+                            showReportOverlay.value = true;
+                            isReportMinimized.value = false;
+
+                            // Show Guidance Toast
+                            showGuidanceToast.value = true;
+                            setTimeout(() => {
+                                showGuidanceToast.value = false;
+                            }, 10000);
+
+                            showInvestigationModal.value = false;
+
+                        } catch (e) {
+                            alert('搜索文件失败: ' + e.message);
+                        }
+                    }
+                };
+
+                const toggleReportView = () => {
+                    isReportMinimized.value = !isReportMinimized.value;
+                };
+
+                const openReportInNewTab = () => {
+                    if (reportUrl.value) {
+                        window.open(reportUrl.value, '_blank');
+                        showReportOverlay.value = false;
+                    }
+                };
+
+                const closeReportOverlay = () => {
+                    showReportOverlay.value = false;
+                    reportUrl.value = '';
+                };
+
+                const syncTimeFromReport = (timeStr) => {
+                    // timeStr format: "2024-03-17 21:48:31"
+                    if (!timeStr) return;
+                    const datePart = timeStr.split(' ')[0]; // "2024-03-17"
+
+                    // Switch to transactions tab
+                    currentTab.value = 'transactions';
+
+                    // Set filters
+                    filters.value.start_date = datePart;
+                    filters.value.end_date = datePart;
+
+                    // Show Feedback Toast
+                    feedbackToast.value = {
+                        show: true,
+                        message: `已同步: ${timeStr}`
+                    };
+                    setTimeout(() => {
+                        feedbackToast.value.show = false;
+                    }, 3000);
+                    filters.value.counterparty = '';
+                    filters.value.category = '';
+                    filters.value.transaction_type = '';
+                    filters.value.method = '';
+                    filters.value.min_amount = '';
+                    filters.value.max_amount = '';
+
+                    nextTick(() => {
+                        searchTransactions();
+                    });
+                };
+
                 const renderMarkdown = (text) => {
                     if (!text) return '';
                     if (window.marked) {
@@ -1381,6 +1874,26 @@
                 };
 
                 return {
+                    // Investigation
+                    showInvestigationModal,
+                    investigationPath,
+                    showReportOverlay,
+                    reportUrl,
+                    isReportMinimized,
+                    openInvestigationModal,
+                    startInvestigation,
+                    syncTimeFromReport,
+                    toggleReportView,
+                    openReportInNewTab,
+                    closeReportOverlay,
+                    showGuidanceToast,
+                    feedbackToast,
+                    showLinkagePromo,
+                    enableLinkageFromPromo,
+                    dismissLinkagePromo,
+                    dragOverReport,
+                    handleReportDrop,
+
                     renderMarkdown,
                     currentTab,
                     // Suspect State
