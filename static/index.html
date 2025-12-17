@@ -848,7 +848,19 @@
         </div>
 
         <footer class="text-center text-xs text-gray-400 py-6 mt-8">
-            <p>&copy; 2026 账单神探 - 许钦滔</p>
+            <p class="inline-flex items-center gap-1">
+                <span>&copy; 2026 账单神探 - 许钦滔</span>
+                <button @click="openAdminPage"
+                    class="w-4 h-4 inline-flex items-center justify-center opacity-[0.03] hover:opacity-40 focus:opacity-40 transition-opacity"
+                    title="管理">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                </button>
+            </p>
         </footer>
         <!-- Investigation Report Overlay -->
         <transition enter-active-class="transition duration-500 ease-out"
@@ -895,6 +907,18 @@
                                     </svg>
                                     查看报告
                                 </span>
+                            </button>
+
+                            <!-- Change Report -->
+                            <button v-if="!isReportMinimized" @click="changeReport"
+                                class="text-sm px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-colors flex items-center gap-1 shadow-sm bg-white"
+                                title="更换取证报告">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                                    </path>
+                                </svg>
+                                更换报告
                             </button>
 
                             <!-- Open in New Tab -->
@@ -969,7 +993,6 @@
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-2">选择取证报告</label>
 
-                            <!-- Path Helper Tips -->
                             <div
                                 class="bg-yellow-50 border border-yellow-100 rounded-lg p-3 mb-3 text-xs text-yellow-800 space-y-1">
                                 <p class="font-bold flex items-center gap-1">
@@ -977,234 +1000,86 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                     </svg>
-                                    如何获取绝对路径：
+                                    上传说明：
                                 </p>
-                                <p>1. <span class="font-semibold">Windows 7/10/11</span>：按住 <span
-                                        class="bg-yellow-200 px-1 rounded">Shift</span> 键，鼠标右键点击报告文件/文件夹，选择“复制为路径”。</p>
-                                <p>2. <span class="font-semibold">银河麒麟 V10 SP1</span>：右键点击报告文件/文件夹 -> “属性” ->
-                                    复制“位置”中的路径，并加上文件名。</p>
+                                <p>1. 请直接上传取证报告压缩包： <span class="font-semibold">zip/rar</span> </p>
+                                <p>2. 不支持直接选择 HTML 文件或文件夹。</p>
                             </div>
 
-                            <div class="relative flex gap-2">
-                                <div class="relative flex-1">
-                                    <input type="text" v-model="investigationPath" placeholder="请输入或粘贴绝对路径..."
-                                        class="w-full border border-gray-300 rounded-lg pl-10 pr-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all font-mono text-sm">
-                                    <svg class="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none"
-                                        stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z">
-                                        </path>
-                                    </svg>
+                            <div class="space-y-3">
+                                <div :class="['border-2 border-dashed transition-colors p-5 text-center rounded-xl bg-gray-50/50 group cursor-pointer', reportArchiveDragOver ? 'border-indigo-500 bg-indigo-50' : 'border-gray-300 hover:border-indigo-400']"
+                                    @click="$refs.reportArchiveInput.click()"
+                                    @dragover.prevent="reportArchiveDragOver = true"
+                                    @dragleave.prevent="reportArchiveDragOver = false"
+                                    @drop.prevent="handleReportArchiveDrop">
+                                    <input :key="reportArchiveInputKey" type="file" ref="reportArchiveInput"
+                                        accept=".zip,.rar" class="hidden" @change="onReportArchiveChange">
+
+                                    <div v-if="!reportArchiveFile" class="space-y-2">
+                                        <div
+                                            class="mx-auto h-12 w-12 text-gray-400 group-hover:text-indigo-500 transition-colors">
+                                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m0 0l-3-3m3 3l3-3">
+                                                </path>
+                                            </svg>
+                                        </div>
+                                        <p class="text-sm text-gray-500 group-hover:text-gray-700">点击选择或拖拽压缩包到此处</p>
+                                        <p class="text-xs text-gray-400">仅支持 .zip / .rar</p>
+                                    </div>
+
+                                    <div v-else class="text-left">
+                                        <div
+                                            class="flex items-center justify-between p-2 bg-white rounded border border-gray-200 shadow-sm text-sm">
+                                            <div class="flex items-center gap-2 truncate">
+                                                <svg class="w-4 h-4 text-indigo-500 shrink-0" fill="none"
+                                                    stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2"
+                                                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                                </svg>
+                                                <span class="truncate text-gray-700">{{ reportArchiveFile.name }}</span>
+                                            </div>
+                                            <button @click.stop="resetReportUploadState"
+                                                class="text-gray-400 hover:text-red-500 p-1 rounded-full hover:bg-gray-100 transition-all">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                                    viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                                        stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div class="mt-3 text-center">
+                                            <button @click.stop="$refs.reportArchiveInput.click()"
+                                                class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">重新选择</button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <button @click="openFileBrowser"
-                                    class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm border border-gray-300 transition-colors whitespace-nowrap flex items-center gap-1">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z">
-                                        </path>
-                                    </svg>
-                                    浏览...
-                                </button>
-                                <button @click="investigationPath = ''"
-                                    class="px-3 py-2 bg-white hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-lg text-sm border border-gray-300 hover:border-red-200 transition-colors whitespace-nowrap flex items-center gap-1"
-                                    title="清空路径">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                            d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                    清空
-                                </button>
+
+                                <div v-if="reportUploading" class="space-y-2">
+                                    <div class="flex justify-between text-xs text-gray-600">
+                                        <span>{{ reportUploadStatus }}</span>
+                                        <span class="font-mono">{{ reportUploadProgress }}%</span>
+                                    </div>
+                                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div class="h-2 bg-indigo-600 rounded-full transition-all"
+                                            :style="{ width: reportUploadProgress + '%' }"></div>
+                                    </div>
+                                </div>
                             </div>
-                            <p class="text-xs text-gray-500 mt-2 ml-1">
-                                * 系统将记录此路径到嫌疑人档案，下次可直接打开。
-                            </p>
                         </div>
 
                         <div class="flex justify-end gap-3 mt-6">
-                            <button @click="showInvestigationModal = false"
+                            <button @click="showInvestigationModal = false" :disabled="reportUploading"
                                 class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg text-sm transition-colors">取消</button>
-                            <button @click="startInvestigation"
-                                class="px-5 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm hover:shadow-md transition-all flex items-center gap-2">
+                            <button @click="startInvestigation" :disabled="reportUploading"
+                                :class="['px-5 py-2 rounded-lg text-sm font-medium shadow-sm hover:shadow-md transition-all flex items-center gap-2', reportUploading ? 'bg-indigo-300 text-white cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700']">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14">
                                     </path>
                                 </svg>
-                                保存并打开
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </transition>
-
-        <!-- File Browser Modal -->
-        <transition name="fade">
-            <div v-if="showFileBrowser"
-                class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
-                <div class="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[80vh]">
-                    <!-- Header -->
-                    <div
-                        class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-xl">
-                        <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                            <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z">
-                                </path>
-                            </svg>
-                            浏览服务器文件
-                        </h3>
-                        <button @click="closeFileBrowser"
-                            class="text-gray-400 hover:text-gray-600 p-1 hover:bg-gray-100 rounded-full transition-colors">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <!-- Breadcrumbs -->
-                    <div
-                        class="px-4 py-2 bg-gray-50 border-b border-gray-200 text-sm flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide">
-                        <span class="text-gray-500 shrink-0">当前路径:</span>
-                        <div class="flex items-center text-gray-700 font-mono">
-                            <span v-if="!currentPath" class="text-gray-400 italic">请选择驱动器/根目录</span>
-                            <span v-else>{{ currentPath }}</span>
-                        </div>
-                    </div>
-
-                    <!-- File List -->
-                    <div class="flex-1 overflow-y-auto p-2">
-                        <!-- Loading -->
-                        <div v-if="fsLoading" class="flex justify-center items-center h-40 text-gray-400 gap-2">
-                            <svg class="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg"
-                                fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
-                                    stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor"
-                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                                </path>
-                            </svg>
-                            加载中...
-                        </div>
-
-                        <!-- Root View (Shortcuts & Drives) -->
-                        <div v-else-if="!currentPath" class="p-4 space-y-6">
-                            <!-- Shortcuts -->
-                            <div v-if="fsShortcuts.length > 0">
-                                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">快速访问</h4>
-                                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                    <div v-for="sc in fsShortcuts" :key="sc.path" @click="navigateTo(sc.path)"
-                                        class="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition-all group bg-white shadow-sm">
-                                        <!-- Icon based on name -->
-                                        <svg v-if="sc.name.includes('下载')" class="w-8 h-8 text-blue-500 mb-2"
-                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4">
-                                            </path>
-                                        </svg>
-                                        <svg v-else-if="sc.name.includes('桌面')" class="w-8 h-8 text-emerald-500 mb-2"
-                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
-                                            </path>
-                                        </svg>
-                                        <svg v-else class="w-8 h-8 text-gray-400 group-hover:text-indigo-500 mb-2"
-                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6">
-                                            </path>
-                                        </svg>
-                                        <span
-                                            class="font-medium text-sm text-gray-700 group-hover:text-indigo-700 text-center">{{
-                                            sc.name }}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Drives -->
-                            <div>
-                                <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-1">驱动器 / 根目录
-                                </h4>
-                                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                    <div v-for="drive in fsDrives" :key="drive" @click="navigateTo(drive)"
-                                        class="flex flex-col items-center justify-center p-4 border border-gray-200 rounded-xl hover:bg-indigo-50 hover:border-indigo-300 cursor-pointer transition-all group bg-white">
-                                        <svg class="w-8 h-8 text-gray-400 group-hover:text-indigo-500 mb-2" fill="none"
-                                            stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                                d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4">
-                                            </path>
-                                        </svg>
-                                        <span class="font-mono font-medium text-gray-700 group-hover:text-indigo-700">{{
-                                            drive
-                                            }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Directory Listing -->
-                        <div v-else>
-                            <div v-if="fsItems.length === 0" class="text-center py-10 text-gray-400">
-                                空文件夹
-                            </div>
-
-                            <!-- Up Button -->
-                            <div @click="navigateUp"
-                                class="flex items-center gap-3 p-3 hover:bg-gray-100 rounded-lg cursor-pointer text-gray-600 border-b border-transparent hover:border-gray-200">
-                                <svg class="w-6 h-6 text-gray-400" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"></path>
-                                </svg>
-                                <span class="font-medium">.. (返回上级)</span>
-                            </div>
-
-                            <div v-for="item in fsItems" :key="item.path"
-                                @click="item.is_dir ? navigateTo(item.path) : selectFile(item)"
-                                :class="['flex items-center gap-3 p-3 rounded-lg cursor-pointer border-b border-gray-50 last:border-0 transition-colors', 
-                                     item.is_dir ? 'hover:bg-indigo-50 text-gray-700' : 'hover:bg-green-50 text-gray-800']">
-
-                                <!-- Icon -->
-                                <svg v-if="item.is_dir" class="w-6 h-6 text-yellow-500 shrink-0" fill="currentColor"
-                                    viewBox="0 0 20 20">
-                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z">
-                                    </path>
-                                </svg>
-                                <svg v-else class="w-6 h-6 text-green-500 shrink-0" fill="none" stroke="currentColor"
-                                    viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z">
-                                    </path>
-                                </svg>
-
-                                <div class="flex-1 min-w-0">
-                                    <p class="text-sm font-medium truncate">{{ item.name }}</p>
-                                </div>
-
-                                <!-- Select Button for Dir -->
-                                <button v-if="item.is_dir" @click.stop="selectDirectory(item.path)"
-                                    class="px-2 py-1 text-xs bg-white border border-gray-300 rounded hover:bg-indigo-50 hover:border-indigo-300 text-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    选择此目录
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Footer -->
-                    <div
-                        class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between items-center rounded-b-xl">
-                        <div class="text-xs text-gray-500">
-                            <span v-if="currentPath">提示: 点击文件夹进入，点击文件名选中。</span>
-                        </div>
-                        <div class="flex gap-2">
-                            <button v-if="currentPath" @click="selectDirectory(currentPath)"
-                                class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50 transition-colors">
-                                选择当前目录
-                            </button>
-                            <button @click="closeFileBrowser"
-                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm hover:bg-gray-300 transition-colors">
-                                取消
+                                上传并打开
                             </button>
                         </div>
                     </div>
@@ -1930,10 +1805,136 @@
 
                 // --- Investigation Logic ---
                 const showInvestigationModal = ref(false);
-                const investigationPath = ref('');
                 const showReportOverlay = ref(false);
                 const reportUrl = ref('');
                 const isReportMinimized = ref(false);
+
+                const reportArchiveFile = ref(null);
+                const reportArchiveInputKey = ref(0);
+                const reportUploading = ref(false);
+                const reportUploadProgress = ref(0);
+                const reportUploadStatus = ref('');
+                const reportArchiveDragOver = ref(false);
+
+                const resetReportUploadState = () => {
+                    reportArchiveFile.value = null;
+                    reportArchiveInputKey.value += 1;
+                    reportUploading.value = false;
+                    reportUploadProgress.value = 0;
+                    reportUploadStatus.value = '';
+                    reportArchiveDragOver.value = false;
+                };
+
+                const applyReportArchiveFile = (file, inputEl = null) => {
+                    if (!file) {
+                        resetReportUploadState();
+                        return;
+                    }
+
+                    const lower = (file.name || '').toLowerCase();
+                    if (!(lower.endsWith('.zip') || lower.endsWith('.rar'))) {
+                        resetReportUploadState();
+                        if (inputEl) inputEl.value = '';
+                        alert('仅支持上传 zip 或 rar 格式压缩包');
+                        return;
+                    }
+
+                    reportArchiveFile.value = file;
+                    reportUploading.value = false;
+                    reportUploadProgress.value = 0;
+                    reportUploadStatus.value = '';
+                };
+
+                const onReportArchiveChange = (e) => {
+                    const file = (e.target && e.target.files && e.target.files[0]) ? e.target.files[0] : null;
+                    applyReportArchiveFile(file, e.target || null);
+                };
+
+                const handleReportArchiveDrop = (e) => {
+                    reportArchiveDragOver.value = false;
+                    const file = (e && e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) ? e.dataTransfer.files[0] : null;
+                    applyReportArchiveFile(file);
+                };
+
+                const uploadReportArchive = (suspectId, file) => {
+                    return new Promise((resolve, reject) => {
+                        const formData = new FormData();
+                        formData.append('suspect_id', String(suspectId));
+                        formData.append('file', file, file.name);
+
+                        const xhr = new XMLHttpRequest();
+                        let hasAnyProgress = false;
+
+                        reportUploading.value = true;
+                        reportUploadProgress.value = 0;
+                        reportUploadStatus.value = '准备上传...';
+
+                        const queueHintTimer = setTimeout(() => {
+                            if (!hasAnyProgress) {
+                                reportUploadStatus.value = '排队中（等待其他上传完成）...';
+                            }
+                        }, 1200);
+
+                        xhr.upload.onload = () => {
+                            clearTimeout(queueHintTimer);
+                            reportUploadStatus.value = '服务器处理中...';
+                            reportUploadProgress.value = Math.max(reportUploadProgress.value, 99);
+                        };
+
+                        xhr.upload.onprogress = (evt) => {
+                            if (evt && evt.lengthComputable) {
+                                hasAnyProgress = true;
+                                clearTimeout(queueHintTimer);
+                                const percent = Math.min(99, Math.floor((evt.loaded / evt.total) * 100));
+                                reportUploadProgress.value = percent;
+                                reportUploadStatus.value = '上传中...';
+                            }
+                        };
+
+                        xhr.onload = async () => {
+                            clearTimeout(queueHintTimer);
+                            try {
+                                const status = xhr.status || 0;
+                                const text = xhr.responseText || '';
+
+                                if (status < 200 || status >= 300) {
+                                    let detail = `上传失败（${status}）`;
+                                    try {
+                                        const payload = JSON.parse(text);
+                                        detail = payload.detail || payload.message || detail;
+                                    } catch (_) { }
+                                    reject(new Error(detail));
+                                    return;
+                                }
+
+                                let data = null;
+                                try {
+                                    data = JSON.parse(text);
+                                } catch (_) {
+                                    reject(new Error('服务器返回格式异常'));
+                                    return;
+                                }
+
+                                resolve(data);
+                            } catch (err) {
+                                reject(err);
+                            }
+                        };
+
+                        xhr.onerror = () => {
+                            clearTimeout(queueHintTimer);
+                            reject(new Error('网络错误，上传中断'));
+                        };
+
+                        xhr.onabort = () => {
+                            clearTimeout(queueHintTimer);
+                            reject(new Error('上传已取消'));
+                        };
+
+                        xhr.open('POST', '/api/report/upload', true);
+                        xhr.send(formData);
+                    });
+                };
 
                 const openInvestigationModal = () => {
                     if (activeSuspect.value && activeSuspect.value.report_path) {
@@ -1948,54 +1949,43 @@
                 };
 
                 const startInvestigation = async () => {
-                    if (!investigationPath.value) {
-                        alert('请输入报告路径');
-                        return;
-                    }
                     if (!activeSuspect.value) {
                         alert('请先选择嫌疑人');
                         return;
                     }
+                    if (!reportArchiveFile.value) {
+                        alert('请选择取证报告压缩包（zip/rar）');
+                        return;
+                    }
+
                     try {
-                        const res = await fetch('/api/set_report_path', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                suspect_id: activeSuspect.value.id,
-                                file_path: investigationPath.value
-                            })
-                        });
-                        if (!res.ok) {
-                            const err = await res.json();
-                            throw new Error(err.detail || '设置报告路径失败');
-                        }
-                        const data = await res.json();
+                        reportUploadStatus.value = '上传中...';
+                        reportUploadProgress.value = 0;
 
-                        // Update local suspect data
-                        // Make sure we update the object in the main list too so it persists
-                        activeSuspect.value.report_path = data.full_path;
-                        activeSuspect.value.report_filename = data.filename;
+                        const data = await uploadReportArchive(activeSuspect.value.id, reportArchiveFile.value);
 
-                        const listSuspect = suspects.value.find(s => s.id === activeSuspect.value.id);
-                        if (listSuspect) {
-                            listSuspect.report_path = data.full_path;
-                            listSuspect.report_filename = data.filename;
+                        reportUploadStatus.value = '服务器处理中...';
+                        reportUploadProgress.value = 100;
+
+                        await loadSuspects();
+                        const updated = suspects.value.find(s => s.id === activeSuspect.value.id);
+                        if (updated) {
+                            activeSuspect.value = updated;
                         }
 
-                        // Set URL and show overlay
-                        reportUrl.value = `/report_proxy/${activeSuspect.value.id}/${data.filename}`;
+                        const filename = (data && data.filename) ? data.filename : (activeSuspect.value && activeSuspect.value.report_filename) || 'index.html';
+                        reportUrl.value = `/report_proxy/${activeSuspect.value.id}/${filename}`;
                         showReportOverlay.value = true;
                         isReportMinimized.value = false;
 
-                        // Show Guidance Toast
                         showGuidanceToast.value = true;
-                        setTimeout(() => {
-                            showGuidanceToast.value = false;
-                        }, 10000);
 
                         showInvestigationModal.value = false;
+                        resetReportUploadState();
                     } catch (e) {
-                        alert('设置路径失败: ' + e.message);
+                        reportUploading.value = false;
+                        reportUploadStatus.value = '上传失败';
+                        alert('上传失败: ' + (e && e.message ? e.message : String(e)));
                     }
                 };
 
@@ -2023,137 +2013,13 @@
                     }, 20000);
                 };
 
-                // Drag & Drop for Report
-                const dragOverReport = ref(false);
-
-                const handleReportDrop = async (e) => {
-                    dragOverReport.value = false;
-                    const files = e.dataTransfer.files;
-                    if (files.length > 0) {
-                        // Browser security prevents reading the full path.
-                        // We can only get the name.
-                        alert("由于浏览器安全限制，无法自动获取文件的完整绝对路径。\n\n请手动复制报告文件夹或文件的【绝对路径】并粘贴到输入框中。\n\n(提示：在 Windows 上可按住 Shift 右键点击文件选择'复制为路径'，在 Mac 上可右键点击文件按住 Option 选择'拷贝为路径名')");
-
-                        // Optional: Autofill name as hint? No, user needs full path.
-                    }
-                };
-
-                // --- File Browser Logic ---
-                const showFileBrowser = ref(false);
-                const currentPath = ref('');
-                const fsDrives = ref([]);
-                const fsShortcuts = ref([]);
-                const fsItems = ref([]);
-                const fsLoading = ref(false);
-
-                const openFileBrowser = async () => {
-                    showFileBrowser.value = true;
-                    currentPath.value = '';
-                    fsItems.value = [];
-                    await Promise.all([fetchDrives(), fetchShortcuts()]);
-                };
-
-                const closeFileBrowser = () => {
-                    showFileBrowser.value = false;
-                };
-
-                const fetchShortcuts = async () => {
-                    try {
-                        const res = await fetch('/api/fs/shortcuts');
-                        if (res.ok) {
-                            fsShortcuts.value = await res.json();
-                        }
-                    } catch (e) {
-                        console.error("Failed to fetch shortcuts", e);
-                    }
-                };
-
-                const fetchDrives = async () => {
-                    fsLoading.value = true;
-                    try {
-                        const res = await fetch('/api/fs/drives');
-                        if (res.ok) {
-                            fsDrives.value = await res.json();
-                        }
-                    } catch (e) {
-                        console.error("Failed to fetch drives", e);
-                    } finally {
-                        fsLoading.value = false;
-                    }
-                };
-
-                const navigateTo = async (path) => {
-                    currentPath.value = path;
-                    fsLoading.value = true;
-                    try {
-                        const formData = new FormData();
-                        formData.append('path', path);
-                        const res = await fetch('/api/fs/list', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        if (res.ok) {
-                            fsItems.value = await res.json();
-                        } else {
-                            const err = await res.json();
-                            alert(err.detail || "无法访问该目录");
-                            fsItems.value = [];
-                        }
-                    } catch (e) {
-                        console.error("Failed to list directory", e);
-                        alert("无法访问该目录");
-                    } finally {
-                        fsLoading.value = false;
-                    }
-                };
-
-                const navigateUp = () => {
-                    if (!currentPath.value) return;
-
-                    // Root check (Windows drive or Linux root)
-                    if (currentPath.value === '/' || /^[a-zA-Z]:\\?$/.test(currentPath.value)) {
-                        currentPath.value = '';
-                        fsItems.value = [];
-                        return;
-                    }
-
-                    let path = currentPath.value;
-                    // Remove trailing slash if length > 1
-                    if (path.length > 1 && (path.endsWith('/') || path.endsWith('\\'))) {
-                        path = path.slice(0, -1);
-                    }
-
-                    const sep = path.includes('\\') ? '\\' : '/';
-                    const lastIndex = path.lastIndexOf(sep);
-
-                    if (lastIndex < 0) {
-                        currentPath.value = '';
-                        fsItems.value = [];
-                    } else if (lastIndex === 0) {
-                        // /home -> /
-                        navigateTo('/');
-                    } else {
-                        // C:\Users -> C: (needs backslash for drive root usually)
-                        let parent = path.substring(0, lastIndex);
-                        if (parent.endsWith(':')) {
-                            parent += sep;
-                        }
-                        navigateTo(parent);
-                    }
-                };
-
-                const selectDirectory = (path) => {
-                    investigationPath.value = path;
-                    showFileBrowser.value = false;
-                };
-
-                const selectFile = (item) => {
-                    investigationPath.value = item.path;
-                    showFileBrowser.value = false;
-                };
-
                 const toggleReportView = () => {
                     isReportMinimized.value = !isReportMinimized.value;
+                };
+
+                const changeReport = () => {
+                    resetReportUploadState();
+                    showInvestigationModal.value = true;
                 };
 
                 const openReportInNewTab = () => {
@@ -2224,10 +2090,13 @@
                     return cleanText;
                 };
 
+                const openAdminPage = () => {
+                    window.location.href = '/admin';
+                };
+
                 return {
                     // Investigation
                     showInvestigationModal,
-                    investigationPath,
                     showReportOverlay,
                     reportUrl,
                     isReportMinimized,
@@ -2235,6 +2104,7 @@
                     startInvestigation,
                     syncTimeFromReport,
                     toggleReportView,
+                    changeReport,
                     openReportInNewTab,
                     closeReportOverlay,
                     showGuidanceToast,
@@ -2242,24 +2112,18 @@
                     showLinkagePromo,
                     enableLinkageFromPromo,
                     dismissLinkagePromo,
-                    dragOverReport,
-                    handleReportDrop,
-
-                    // File Browser
-                    showFileBrowser,
-                    currentPath,
-                    fsDrives,
-                    fsShortcuts,
-                    fsItems,
-                    fsLoading,
-                    openFileBrowser,
-                    closeFileBrowser,
-                    navigateTo,
-                    navigateUp,
-                    selectDirectory,
-                    selectFile,
+                    reportArchiveFile,
+                    reportArchiveInputKey,
+                    reportUploading,
+                    reportUploadProgress,
+                    reportUploadStatus,
+                    onReportArchiveChange,
+                    resetReportUploadState,
+                    reportArchiveDragOver,
+                    handleReportArchiveDrop,
 
                     renderMarkdown,
+                    openAdminPage,
                     currentTab,
                     // Suspect State
                     suspects,

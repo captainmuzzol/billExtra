@@ -24,6 +24,7 @@ uploads/
 bill_app.db
 测试用/
 packages/
+forensic_reports/
 
 # Run_modules
 node_modules

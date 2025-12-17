@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Form
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException, Query, Form, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse, FileResponse, HTMLResponse
@@ -11,6 +11,12 @@ import mimetypes
 import uvicorn
 import requests
 import re
+import asyncio
+import subprocess
+import uuid
+import zipfile
+import json
+import threading
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
@@ -36,6 +42,94 @@ REPORT_CONTEXT = {
     "root_dir": None,
     "main_file": None
 }
+
+REPORTS_DIR = os.path.abspath(os.path.join(os.getcwd(), "forensic_reports"))
+os.makedirs(REPORTS_DIR, exist_ok=True)
+REPORT_UPLOAD_SEMAPHORE = asyncio.Semaphore(2)
+REPORT_ACCESS_LOG_PATH = os.path.join(REPORTS_DIR, "report_access.json")
+REPORT_ACCESS_LOCK = threading.Lock()
+
+def _load_report_access_unlocked():
+    if not os.path.exists(REPORT_ACCESS_LOG_PATH):
+        return {}
+    try:
+        with open(REPORT_ACCESS_LOG_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        return {}
+    return {}
+
+def _write_report_access_unlocked(data: dict):
+    os.makedirs(os.path.dirname(REPORT_ACCESS_LOG_PATH), exist_ok=True)
+    tmp_path = REPORT_ACCESS_LOG_PATH + ".tmp"
+    payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(payload)
+    os.replace(tmp_path, REPORT_ACCESS_LOG_PATH)
+
+def _update_report_access(report_root: str, opened_at: Optional[datetime] = None):
+    if not report_root:
+        return
+    if opened_at is None:
+        opened_at = datetime.now()
+    ts = opened_at.isoformat(timespec="seconds")
+    with REPORT_ACCESS_LOCK:
+        data = _load_report_access_unlocked()
+        data[os.path.abspath(report_root)] = ts
+        _write_report_access_unlocked(data)
+
+def _remove_report_access(report_root: str):
+    if not report_root:
+        return
+    with REPORT_ACCESS_LOCK:
+        data = _load_report_access_unlocked()
+        data.pop(os.path.abspath(report_root), None)
+        _write_report_access_unlocked(data)
+
+def _cleanup_stale_reports(max_age_days: int = 30):
+    cutoff = datetime.now() - timedelta(days=max_age_days)
+    to_delete: list[str] = []
+    with REPORT_ACCESS_LOCK:
+        data = _load_report_access_unlocked()
+        new_data: dict[str, str] = {}
+        for raw_path, raw_ts in data.items():
+            report_root = os.path.abspath(str(raw_path))
+            ts = str(raw_ts)
+
+            if not _is_within_reports_dir(report_root):
+                continue
+            if not os.path.exists(report_root):
+                continue
+
+            try:
+                last_opened = datetime.fromisoformat(ts)
+            except Exception:
+                last_opened = datetime.now()
+
+            if last_opened < cutoff:
+                to_delete.append(report_root)
+                continue
+
+            new_data[report_root] = ts
+
+        _write_report_access_unlocked(new_data)
+
+    delete_targets = []
+    seen = set()
+    for path in to_delete:
+        if not _is_within_reports_dir(path):
+            continue
+        target = _get_report_container_dir(path)
+        if target in seen:
+            continue
+        seen.add(target)
+        delete_targets.append(target)
+
+    for target in delete_targets:
+        if _is_within_reports_dir(target):
+            _delete_tree(target)
 
 # Pydantic Models
 class ReportPathRequest(BaseModel):
@@ -63,6 +157,16 @@ class SuspectRead(BaseModel):
     class Config:
         from_attributes = True
 
+class AdminPurgeReportsRequest(BaseModel):
+    confirm: str
+
+class ReportsStatsResponse(BaseModel):
+    suspect_dirs: int
+    report_versions: int
+    total_files: int
+    total_bytes: int
+    last_modified: Optional[str] = None
+
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
     return FileResponse("static/favicon.ico")
@@ -71,8 +175,242 @@ def favicon():
 def read_root():
     return RedirectResponse(url="/static/index.html")
 
+def _get_reports_stats():
+    suspect_dirs = 0
+    report_versions = 0
+    total_files = 0
+    total_bytes = 0
+    last_mtime: Optional[float] = None
+
+    try:
+        entries = [e for e in os.listdir(REPORTS_DIR) if e and not e.startswith(".")]
+    except Exception:
+        entries = []
+
+    for name in entries:
+        if name == os.path.basename(REPORT_ACCESS_LOG_PATH) or name.endswith(".tmp"):
+            continue
+        full = os.path.join(REPORTS_DIR, name)
+        if os.path.isdir(full):
+            suspect_dirs += 1
+            try:
+                versions = [v for v in os.listdir(full) if v and not v.startswith(".") and os.path.isdir(os.path.join(full, v))]
+            except Exception:
+                versions = []
+            report_versions += len(versions)
+
+    for root, _, files in os.walk(REPORTS_DIR):
+        for fname in files:
+            if fname == os.path.basename(REPORT_ACCESS_LOG_PATH) or fname.endswith(".tmp"):
+                continue
+            fpath = os.path.join(root, fname)
+            try:
+                st = os.stat(fpath)
+                total_files += 1
+                total_bytes += int(st.st_size)
+                if last_mtime is None or st.st_mtime > last_mtime:
+                    last_mtime = float(st.st_mtime)
+            except Exception:
+                continue
+
+    last_modified = None
+    if last_mtime is not None:
+        try:
+            last_modified = datetime.fromtimestamp(last_mtime).isoformat(timespec="seconds")
+        except Exception:
+            last_modified = None
+
+    return {
+        "suspect_dirs": suspect_dirs,
+        "report_versions": report_versions,
+        "total_files": total_files,
+        "total_bytes": total_bytes,
+        "last_modified": last_modified,
+    }
+
+def _purge_all_reports(background_tasks: BackgroundTasks, db: Session):
+    db.query(models.Suspect).update({
+        models.Suspect.report_path: None,
+        models.Suspect.report_filename: None,
+    })
+    db.commit()
+
+    with REPORT_ACCESS_LOCK:
+        _write_report_access_unlocked({})
+
+    try:
+        entries = [e for e in os.listdir(REPORTS_DIR) if e and not e.startswith(".")]
+    except Exception:
+        entries = []
+
+    for name in entries:
+        if name == os.path.basename(REPORT_ACCESS_LOG_PATH) or name.endswith(".tmp"):
+            continue
+        full = os.path.join(REPORTS_DIR, name)
+        if _is_within_reports_dir(full):
+            background_tasks.add_task(_delete_tree, full)
+
+@app.get("/api/admin/reports/stats", response_model=ReportsStatsResponse)
+def admin_reports_stats():
+    return _get_reports_stats()
+
+@app.post("/api/admin/reports/purge")
+def admin_reports_purge(
+    req: AdminPurgeReportsRequest,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(database.get_db),
+):
+    if (req.confirm or "").strip() != "DELETE_ALL_REPORTS":
+        raise HTTPException(status_code=400, detail="确认口令不正确")
+
+    _purge_all_reports(background_tasks, db)
+    return {"status": "ok"}
+
+@app.get("/admin", include_in_schema=False)
+def admin_page():
+    html = """<!doctype html>
+<html lang=\"zh-CN\">
+<head>
+  <meta charset=\"utf-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />
+  <title>管理 - 账单神探</title>
+  <style>
+    body{font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,PingFang SC,Hiragino Sans GB,Microsoft YaHei,sans-serif;background:#0b1220;color:#e5e7eb;margin:0}
+    .wrap{max-width:900px;margin:0 auto;padding:28px 18px}
+    .card{background:#111827;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px}
+    .muted{color:rgba(229,231,235,.7)}
+    .row{display:flex;gap:14px;flex-wrap:wrap}
+    .btn{appearance:none;border:1px solid rgba(255,255,255,.12);background:#0f172a;color:#e5e7eb;border-radius:10px;padding:10px 12px;cursor:pointer}
+    .btn:hover{background:#111b33}
+    .btn-danger{background:#7f1d1d;border-color:rgba(255,255,255,.15)}
+    .btn-danger:hover{background:#991b1b}
+    .input{width:100%;box-sizing:border-box;border:1px solid rgba(255,255,255,.15);background:#0b1020;color:#e5e7eb;border-radius:10px;padding:10px 12px;outline:none}
+    .k{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
+    a{color:#93c5fd;text-decoration:none}
+    a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+  <div class=\"wrap\">
+    <div class=\"row\" style=\"align-items:center;justify-content:space-between;margin-bottom:14px\">
+      <div>
+        <div style=\"font-size:18px;font-weight:700\">管理 - 取证报告</div>
+        <div class=\"muted\" style=\"margin-top:6px\">此页面可删除后台所有已上传的取证报告文件（不可恢复）。</div>
+      </div>
+      <div class=\"row\" style=\"align-items:center\">
+        <a href=\"/\" class=\"muted\">返回系统</a>
+      </div>
+    </div>
+
+    <div class=\"card\">
+      <div class=\"row\" style=\"justify-content:space-between\">
+        <div>
+          <div class=\"muted\">当前报告占用</div>
+          <div id=\"stats\" style=\"margin-top:8px\">加载中...</div>
+        </div>
+        <div>
+          <button id=\"refresh\" class=\"btn\">刷新</button>
+        </div>
+      </div>
+
+      <div style=\"height:14px\"></div>
+
+      <div class=\"muted\">强确认：在下方输入 <span class=\"k\">DELETE_ALL_REPORTS</span> 后才能执行删除。</div>
+      <div style=\"height:8px\"></div>
+      <input id=\"confirm\" class=\"input k\" placeholder=\"DELETE_ALL_REPORTS\" />
+      <div style=\"height:12px\"></div>
+      <button id=\"purge\" class=\"btn btn-danger\" disabled>删除后台所有已上传的报告文件</button>
+      <div id=\"msg\" class=\"muted\" style=\"margin-top:12px\"></div>
+    </div>
+  </div>
+
+  <script>
+    const statsEl = document.getElementById('stats');
+    const msgEl = document.getElementById('msg');
+    const confirmEl = document.getElementById('confirm');
+    const purgeBtn = document.getElementById('purge');
+    const refreshBtn = document.getElementById('refresh');
+
+    const formatBytes = (n) => {
+      if (!Number.isFinite(n)) return '0 B';
+      const units = ['B','KB','MB','GB','TB'];
+      let v = n;
+      let i = 0;
+      while (v >= 1024 && i < units.length - 1) {
+        v /= 1024;
+        i += 1;
+      }
+      const fixed = i === 0 ? 0 : 2;
+      return v.toFixed(fixed) + ' ' + units[i];
+    };
+
+    const setMsg = (t) => {
+      msgEl.textContent = t || '';
+    };
+
+    const loadStats = async () => {
+      setMsg('');
+      statsEl.textContent = '加载中...';
+      const res = await fetch('/api/admin/reports/stats');
+      if (!res.ok) {
+        statsEl.textContent = '加载失败';
+        return;
+      }
+      const data = await res.json();
+      const parts = [];
+      parts.push('嫌疑人目录: ' + (data.suspect_dirs ?? 0));
+      parts.push('报告版本: ' + (data.report_versions ?? 0));
+      parts.push('文件数: ' + (data.total_files ?? 0));
+      parts.push('占用: ' + formatBytes(data.total_bytes ?? 0));
+      if (data.last_modified) parts.push('最近写入: ' + data.last_modified);
+      statsEl.innerHTML = '<div class=\"k\">' + parts.join('<br/>') + '</div>';
+    };
+
+    const syncConfirm = () => {
+      const ok = (confirmEl.value || '').trim() === 'DELETE_ALL_REPORTS';
+      purgeBtn.disabled = !ok;
+    };
+
+    confirmEl.addEventListener('input', syncConfirm);
+    refreshBtn.addEventListener('click', () => loadStats());
+    purgeBtn.addEventListener('click', async () => {
+      if (purgeBtn.disabled) return;
+      purgeBtn.disabled = true;
+      setMsg('正在提交删除任务...');
+      const res = await fetch('/api/admin/reports/purge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: 'DELETE_ALL_REPORTS' })
+      });
+      if (!res.ok) {
+        let detail = '删除失败';
+        try {
+          const payload = await res.json();
+          detail = payload.detail || detail;
+        } catch (_) {}
+        setMsg(detail);
+        syncConfirm();
+        return;
+      }
+      setMsg('已触发删除（后台执行），请稍后刷新查看占用变化。');
+      confirmEl.value = '';
+      syncConfirm();
+      await loadStats();
+    });
+
+    syncConfirm();
+    loadStats();
+  </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
 @app.post("/suspects", response_model=SuspectRead)
-def create_suspect(suspect: SuspectCreate, db: Session = Depends(database.get_db)):
+def create_suspect(
+    suspect: SuspectCreate,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(database.get_db)
+):
     if len(suspect.password) < 3:
         raise HTTPException(status_code=400, detail="Password must be at least 3 characters")
         
@@ -84,6 +422,12 @@ def create_suspect(suspect: SuspectCreate, db: Session = Depends(database.get_db
     db.add(db_suspect)
     db.commit()
     db.refresh(db_suspect)
+
+    if background_tasks:
+        background_tasks.add_task(_cleanup_stale_reports, 30)
+    else:
+        _cleanup_stale_reports(30)
+
     return db_suspect
 
 @app.get("/suspects", response_model=List[SuspectRead])
@@ -440,7 +784,6 @@ def get_stats_by_date(
         "expense": [data[d]["expense"] for d in sorted_dates]
     }
 
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 # Create a limited thread pool specifically for AI tasks
@@ -584,66 +927,163 @@ async def get_ai_analysis(
     else:
         return {"analysis": result["error"]}
 
-@app.post("/api/set_report_path")
-def set_report_path(request: ReportPathRequest, db: Session = Depends(database.get_db)):
-    # Find suspect
-    suspect = db.query(models.Suspect).filter(models.Suspect.id == request.suspect_id).first()
+def _safe_extract_zip(archive_path: str, dest_dir: str):
+    with zipfile.ZipFile(archive_path, "r") as zf:
+        for member in zf.infolist():
+            target_path = os.path.abspath(os.path.join(dest_dir, member.filename))
+            if not target_path.startswith(os.path.abspath(dest_dir) + os.sep):
+                raise HTTPException(status_code=400, detail="压缩包内容不合法")
+        zf.extractall(dest_dir)
+
+def _extract_archive(archive_path: str, dest_dir: str):
+    os.makedirs(dest_dir, exist_ok=True)
+    if zipfile.is_zipfile(archive_path):
+        _safe_extract_zip(archive_path, dest_dir)
+        return
+
+    lower = archive_path.lower()
+    if lower.endswith(".rar"):
+        tool = shutil.which("7z") or shutil.which("7za") or shutil.which("unrar")
+        if not tool:
+            raise HTTPException(status_code=400, detail="服务器缺少解压工具，请上传 zip 格式压缩包")
+
+        if os.path.basename(tool).lower().startswith("unrar"):
+            cmd = [tool, "x", "-y", archive_path, dest_dir]
+        else:
+            cmd = [tool, "x", "-y", f"-o{dest_dir}", archive_path]
+
+        try:
+            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            raise HTTPException(status_code=400, detail="解压失败，请确认压缩包格式正确")
+        return
+
+    raise HTTPException(status_code=400, detail="仅支持上传 zip 或 rar 格式压缩包")
+
+def _detect_report_root(base_dir: str):
+    try:
+        entries = [e for e in os.listdir(base_dir) if e and not e.startswith(".")]
+    except Exception:
+        return base_dir
+
+    if not entries:
+        return base_dir
+
+    dirs = [e for e in entries if os.path.isdir(os.path.join(base_dir, e))]
+    files = [e for e in entries if os.path.isfile(os.path.join(base_dir, e))]
+    has_html_at_root = any(f.lower().endswith((".html", ".htm")) for f in files)
+    if len(dirs) == 1 and not has_html_at_root:
+        return os.path.join(base_dir, dirs[0])
+    return base_dir
+
+def _find_main_html(report_root: str):
+    candidates = []
+    for root, _, files in os.walk(report_root):
+        for name in files:
+            lower = name.lower()
+            if lower.endswith(".html") or lower.endswith(".htm"):
+                full_path = os.path.join(root, name)
+                rel_path = os.path.relpath(full_path, report_root)
+                candidates.append(rel_path)
+
+    if not candidates:
+        raise HTTPException(status_code=400, detail="压缩包内未找到 HTML 报告文件")
+
+    for rel in candidates:
+        if "取证分析报告" in rel:
+            return rel
+
+    for rel in candidates:
+        if os.path.basename(rel).lower() == "index.html":
+            return rel
+
+    return sorted(candidates, key=lambda p: p.lower())[0]
+
+def _delete_tree(path: str):
+    try:
+        if os.path.isdir(path):
+            shutil.rmtree(path, ignore_errors=True)
+        elif os.path.exists(path):
+            os.remove(path)
+    except Exception:
+        return
+
+def _get_report_container_dir(report_root: str):
+    try:
+        abs_root = os.path.abspath(report_root)
+        if not abs_root.startswith(REPORTS_DIR + os.sep):
+            return abs_root
+        rel = os.path.relpath(abs_root, REPORTS_DIR)
+        parts = rel.split(os.sep)
+        if len(parts) >= 2:
+            return os.path.join(REPORTS_DIR, parts[0], parts[1])
+        return abs_root
+    except Exception:
+        return report_root
+
+def _is_within_reports_dir(path: str):
+    try:
+        abs_path = os.path.abspath(path)
+        return abs_path.startswith(REPORTS_DIR + os.sep)
+    except Exception:
+        return False
+
+@app.post("/api/report/upload")
+async def upload_report(
+    background_tasks: BackgroundTasks,
+    suspect_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(database.get_db)
+):
+    suspect = db.query(models.Suspect).filter(models.Suspect.id == suspect_id).first()
     if not suspect:
         raise HTTPException(status_code=404, detail="Suspect not found")
 
-    path = None
-    
-    # Priority: Direct path
-    if request.file_path:
-        path = request.file_path.strip()
-        # Remove quotes if user copied as path
-        if (path.startswith('"') and path.endswith('"')) or (path.startswith("'") and path.endswith("'")):
-            path = path[1:-1]
-    
-    # Fallback: Search by name (Deprecated, but kept for compatibility if needed, though user advised against it)
-    # logic removed as per user instruction "search is wrong"
-            
-    if not path:
-        raise HTTPException(status_code=400, detail="请提供有效的本地绝对路径")
+    filename = (file.filename or "").strip()
+    lower = filename.lower()
+    if not (lower.endswith(".zip") or lower.endswith(".rar")):
+        if lower.endswith((".html", ".htm")):
+            raise HTTPException(status_code=400, detail="请上传取证报告压缩包（zip/rar），不支持直接上传 HTML")
+        raise HTTPException(status_code=400, detail="仅支持上传 zip 或 rar 格式压缩包")
 
-    if not os.path.exists(path):
-         raise HTTPException(status_code=400, detail="路径不存在 (请确保服务器有权限访问该路径)")
-    
-    # Determine main file
-    main_file = None
-    root_dir = path
-    
-    if os.path.isdir(path):
-        # Try to find main html file
-        try:
-            candidates = [f for f in os.listdir(path) if f.lower().endswith('.html')]
-        except Exception as e:
-            raise HTTPException(status_code=400, detail=f"无法读取目录: {str(e)}")
+    await REPORT_UPLOAD_SEMAPHORE.acquire()
+    try:
+        report_version = uuid.uuid4().hex
+        work_dir = os.path.join(REPORTS_DIR, str(suspect_id), report_version)
+        os.makedirs(work_dir, exist_ok=True)
 
-        # Priority 1: Contains "取证分析报告"
-        for f in candidates:
-            if "取证分析报告" in f:
-                main_file = f
-                break
-        # Priority 2: index.html
-        if not main_file and "index.html" in candidates:
-            main_file = "index.html"
-        # Priority 3: First html file
-        if not main_file and candidates:
-            main_file = candidates[0]
-            
-        if not main_file:
-             raise HTTPException(status_code=400, detail="该目录下未找到 HTML 报告文件")
-    else:
-        root_dir = os.path.dirname(path)
-        main_file = os.path.basename(path)
-    
-    # Save to DB
-    suspect.report_path = path
-    suspect.report_filename = main_file
-    db.commit()
-    
-    return {"status": "ok", "filename": main_file, "full_path": path}
+        archive_path = os.path.join(work_dir, filename)
+        with open(archive_path, "wb") as out:
+            while True:
+                chunk = await file.read(1024 * 1024)
+                if not chunk:
+                    break
+                out.write(chunk)
+
+        _extract_archive(archive_path, work_dir)
+        _delete_tree(archive_path)
+
+        report_root = _detect_report_root(work_dir)
+        main_rel = _find_main_html(report_root).replace("\\", "/")
+
+        old_report_root = suspect.report_path
+        suspect.report_path = report_root
+        suspect.report_filename = main_rel
+        db.commit()
+
+        if old_report_root and old_report_root != report_root and _is_within_reports_dir(old_report_root):
+            await asyncio.to_thread(_remove_report_access, old_report_root)
+            old_delete_target = _get_report_container_dir(old_report_root)
+            background_tasks.add_task(_delete_tree, old_delete_target)
+
+        await asyncio.to_thread(_update_report_access, report_root)
+        return {"status": "ok", "filename": main_rel}
+    finally:
+        REPORT_UPLOAD_SEMAPHORE.release()
+
+@app.post("/api/set_report_path")
+def set_report_path(request: ReportPathRequest, db: Session = Depends(database.get_db)):
+    raise HTTPException(status_code=400, detail="服务器部署场景不支持选择本地路径，请上传取证报告压缩包（zip/rar）")
 
 @app.get("/report_proxy/{suspect_id}/{file_path:path}")
 def report_proxy(suspect_id: int, file_path: str, db: Session = Depends(database.get_db)):
@@ -669,6 +1109,12 @@ def report_proxy(suspect_id: int, file_path: str, db: Session = Depends(database
     
     if not os.path.exists(full_path):
         raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+
+    try:
+        if suspect.report_filename and file_path.replace("\\", "/") == suspect.report_filename.replace("\\", "/"):
+            _update_report_access(path)
+    except Exception:
+        pass
         
     mime_type, _ = mimetypes.guess_type(full_path)
     if not mime_type:
@@ -751,85 +1197,6 @@ def report_proxy(suspect_id: int, file_path: str, db: Session = Depends(database
              return FileResponse(full_path)
              
     return FileResponse(full_path)
-
-# --- Filesystem API for Browser ---
-
-@app.get("/api/fs/drives")
-def list_drives():
-    """List available drives (Windows) or root (Linux/Mac)"""
-    drives = []
-    if os.name == 'nt':
-        import string
-        from ctypes import windll
-        bitmask = windll.kernel32.GetLogicalDrives()
-        for letter in string.ascii_uppercase:
-            if bitmask & 1:
-                drives.append(f"{letter}:\\")
-            bitmask >>= 1
-    else:
-        drives.append("/")
-    return drives
-
-@app.get("/api/fs/shortcuts")
-def list_shortcuts():
-    """List common shortcuts (Desktop, Downloads)"""
-    shortcuts = []
-    home = os.path.expanduser("~")
-    
-    # Common candidate names for Desktop and Downloads
-    desktop_names = ["Desktop", "桌面"]
-    download_names = ["Downloads", "下载"]
-    
-    # Find Desktop
-    for name in desktop_names:
-        path = os.path.join(home, name)
-        if os.path.exists(path) and os.path.isdir(path):
-            shortcuts.append({"name": "桌面 (Desktop)", "path": path})
-            break
-            
-    # Find Downloads
-    for name in download_names:
-        path = os.path.join(home, name)
-        if os.path.exists(path) and os.path.isdir(path):
-            shortcuts.append({"name": "下载 (Downloads)", "path": path})
-            break
-            
-    # Add Home as well
-    shortcuts.append({"name": "用户主目录 (Home)", "path": home})
-    
-    return shortcuts
-
-@app.post("/api/fs/list")
-def list_directory(path: str = Form(...)):
-    """List contents of a directory"""
-    if not os.path.exists(path):
-         raise HTTPException(status_code=404, detail="Directory not found")
-    if not os.path.isdir(path):
-         raise HTTPException(status_code=400, detail="Not a directory")
-         
-    items = []
-    try:
-        with os.scandir(path) as it:
-            for entry in it:
-                try:
-                    is_dir = entry.is_dir()
-                    # Filter: Only show directories or HTML files (potential reports)
-                    if is_dir or entry.name.lower().endswith('.html'):
-                        items.append({
-                            "name": entry.name,
-                            "path": entry.path,
-                            "is_dir": is_dir
-                        })
-                except PermissionError:
-                    continue
-    except PermissionError:
-        raise HTTPException(status_code=403, detail="Permission denied")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-        
-    # Sort: Directories first, then files
-    items.sort(key=lambda x: (not x['is_dir'], x['name'].lower()))
-    return items
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8180, reload=True)
