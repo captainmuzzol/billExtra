@@ -2216,10 +2216,12 @@
 
                 const renderMarkdown = (text) => {
                     if (!text) return '';
+                    // Remove all empty lines to make the output more compact
+                    const cleanText = text.replace(/^\s*[\r\n]/gm, '');
                     if (window.marked) {
-                        return window.marked.parse(text);
+                        return window.marked.parse(cleanText);
                     }
-                    return text;
+                    return cleanText;
                 };
 
                 return {
